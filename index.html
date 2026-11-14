@@ -162,6 +162,10 @@ input[readonly]{color:var(--muted)}
         <div><label for="catInsp">Categoría</label><input id="catInsp"></div>
       </div>
       <label for="oficina">Correo de la oficina (recibe copia de cada envío)</label><input id="oficina" type="email">
+      <h3>Envío automático (Gmail)</h3>
+      <label for="svcUrl">Dirección del servicio de envío</label><input id="svcUrl" type="url" placeholder="https://script.google.com/macros/s/…/exec" autocomplete="off">
+      <label for="svcKey">Clave de envío</label><input id="svcKey" autocomplete="off">
+      <p class="note">Con estos dos datos, el botón Correo envía el PDF solo, y al enviar por WhatsApp la oficina recibe su copia por correo. Sin ellos, se abre la app de correo como antes.</p>
       <p class="note">Se guarda en este móvil. Cada técnico pone aquí su nombre y su firma una sola vez.</p>
     </details>
   </section>
@@ -197,7 +201,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
 
   /* ---------- Inspector ---------- */
   var insp = Object.assign({ insp: "", catInsp: "A", oficina: "butanhogar@butanhogar.com" }, load("bh_insp", {}));
-  ["insp", "catInsp", "oficina"].forEach(function(k){
+  ["insp", "catInsp", "oficina", "svcUrl", "svcKey"].forEach(function(k){
     $(k).value = insp[k] || "";
     $(k).addEventListener("input", function(){ insp[k] = $(k).value.trim(); store("bh_insp", insp); });
   });
@@ -620,23 +624,67 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   }
   function abrir(url){ var w = window.open(url, "_blank"); if(!w) location.href = url; }
 
+  /* ---------- Envío automático a través del script de Google (Gmail del técnico) ---------- */
+  function servicioListo(){ return /^https:\/\/script\.google(usercontent)?\.com\//.test(insp.svcUrl || "") && !!insp.svcKey; }
+  function asunto(d){ return "Certificados de revisión – " + (d.titular || "Butanhogar"); }
+  function enviarServicio(r, para, copiaOficina, texto){
+    var pdf = r.doc.output("datauristring").split(",")[1];
+    var ctrl = window.AbortController ? new AbortController() : null;
+    var t = setTimeout(function(){ if(ctrl) ctrl.abort(); }, 45000);
+    return fetch(insp.svcUrl, {
+      method: "POST", redirect: "follow", signal: ctrl ? ctrl.signal : undefined,
+      headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify({ clave: insp.svcKey, para: para, copiaOficina: !!copiaOficina, asunto: asunto(r.d), texto: texto, nombre: r.nombre, pdf: pdf })
+    }).then(function(res){ return res.json(); }).then(function(j){
+      clearTimeout(t);
+      if(!j || !j.ok) throw new Error(j && j.error ? j.error : "respuesta no válida");
+      return j;
+    }, function(e){ clearTimeout(t); throw e; });
+  }
+  function ocupado(on){ ["wa", "mail", "download"].forEach(function(id){ $(id).disabled = on; $(id).style.opacity = on ? .5 : 1; }); }
+
   $("wa").addEventListener("click", function(){
     var r = generar(); if(!r) return;
     var num = waNumber(r.d);
+    var url = "https://wa.me/" + (num || "") + "?text=" + encodeURIComponent(mensaje(r.d, "Le adjunto el PDF a continuación."));
     descargar(r);
-    abrir("https://wa.me/" + (num || "") + "?text=" + encodeURIComponent(mensaje(r.d, "Le adjunto el PDF a continuación.")));
-    toast(num ? "PDF descargado. En el chat del cliente pulsa el clip → Documento y elige el PDF." : "No hay móvil del cliente: elige el contacto en WhatsApp y adjunta el PDF descargado.");
-    if(insp.oficina) setTimeout(function(){ toast("Recuerda: para la copia a la oficina usa el botón Correo."); }, 4000);
+    var aviso = num ? "En el chat del cliente pulsa el clip → Documento y elige el PDF más reciente." : "No hay móvil del cliente: elige el contacto en WhatsApp y adjunta el PDF.";
+    if(servicioListo() && insp.oficina){
+      ocupado(true); toast("Enviando copia a la oficina…");
+      var copia = "Copia del certificado enviado por WhatsApp a " + (r.d.titular || "") + " (" + (r.d.movil || r.d.tel || "sin móvil") + "), " + r.d.calle + (r.d.poblacion ? ", " + r.d.poblacion : "") + ".\nTécnico: " + (r.d.insp || "");
+      enviarServicio(r, insp.oficina, false, copia).then(function(){
+        toast("Copia enviada a la oficina. " + aviso);
+      }, function(e){
+        toast("No se pudo enviar la copia a la oficina (" + e.message + "). Envíala luego con el botón Correo.");
+      }).then(function(){ ocupado(false); setTimeout(function(){ location.href = url; }, 900); });
+    } else {
+      abrir(url); toast("PDF descargado. " + aviso);
+    }
   });
 
-  $("mail").addEventListener("click", function(){
-    var r = generar(); if(!r) return;
-    descargar(r);
+  function correoManual(r){
     var to = r.d.email || insp.oficina || "";
     var cc = r.d.email && insp.oficina ? "&cc=" + insp.oficina.replace(/[^\w.@+\-]/g, "") : "";
     var body = mensaje(r.d, "Adjuntamos los certificados en PDF.");
-    location.href = "mailto:" + to.replace(/[^\w.@+\-,]/g, "") + "?subject=" + encodeURIComponent("Certificados de revisión – " + (r.d.titular || "Butanhogar")) + cc + "&body=" + encodeURIComponent(body);
-    toast(r.d.email ? "PDF descargado. Adjúntalo en el correo (clip → Descargas) y envía." : "No hay correo del cliente: se abre solo con la oficina.");
+    location.href = "mailto:" + to.replace(/[^\w.@+\-,]/g, "") + "?subject=" + encodeURIComponent(asunto(r.d)) + cc + "&body=" + encodeURIComponent(body);
+  }
+  $("mail").addEventListener("click", function(){
+    var r = generar(); if(!r) return;
+    if(!servicioListo()){
+      descargar(r); correoManual(r);
+      toast(r.d.email ? "PDF descargado. Adjúntalo en el correo (clip → Descargas) y envía." : "No hay correo del cliente: se abre solo con la oficina.");
+      return;
+    }
+    var para = r.d.email || insp.oficina;
+    if(!para){ toast("Falta el correo del cliente."); return; }
+    if(!r.d.email && !confirm("El cliente no tiene correo. ¿Enviar solo a la oficina?")) return;
+    ocupado(true); toast("Enviando correo…");
+    enviarServicio(r, para, !!r.d.email, mensaje(r.d, "Adjuntamos los certificados en PDF.")).then(function(j){
+      toast(r.d.email ? "✔ Enviado a " + r.d.email + (insp.oficina ? " con copia a la oficina." : ".") : "✔ Enviado a la oficina.");
+    }, function(e){
+      toast("No se pudo enviar automáticamente (" + e.message + "). Se abre el correo para enviarlo a mano.");
+      setTimeout(function(){ descargar(r); correoManual(r); }, 1500);
+    }).then(function(){ ocupado(false); });
   });
 
   /* ---------- Borrador: se guarda solo para no perder nada al ir a WhatsApp y volver ---------- */
