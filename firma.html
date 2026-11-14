@@ -58,9 +58,7 @@ ol li{margin:6px 0}
   ];
   function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]; }); }
   function html(){
-    var F = "font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;";
-    return '<img src="' + IMG + '" width="560" alt="Oscar Marín Fernández · Butanhogar · 967 22 18 26" style="display:block;width:560px;max-width:100%;height:auto;border:0;margin:0 0 10px;">' +
-      LEGAL.map(function(t){ return '<p style="margin:0 0 6px;max-width:560px;text-align:justify;' + F + 'font-size:10.5px;line-height:1.35;color:#6b7280;">' + esc(t) + '</p>'; }).join("");
+    return '<img src="' + IMG + '" width="600" alt="Oscar Marín Fernández · Instalador de gas categoría A · Butanhogar · 967 22 18 26 · butanhogar@butanhogar.com" style="display:block;width:600px;max-width:100%;height:auto;border:0;">';
   }
   document.getElementById("firma").innerHTML = html();
   document.getElementById("copiar").addEventListener("click", function(){
