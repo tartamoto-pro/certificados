@@ -193,7 +193,7 @@ input[readonly]{color:var(--muted)}
       <label for="svcKey">Clave de envío</label><input id="svcKey" autocomplete="off">
       <p class="note">Con estos dos datos, el botón Correo envía el PDF solo, y al enviar por WhatsApp la oficina recibe su copia por correo. Sin ellos, se abre la app de correo como antes.</p>
       <h3>Firma del correo</h3>
-      <label for="remitente">Nombre del remitente (lo que ve el cliente)</label><input id="remitente" placeholder="Butanhogar · Oscar">
+      <label for="remitente">Nombre del remitente (lo que ve el cliente)</label><input id="remitente" placeholder="BUTANHOGAR Mantenimiento">
       <div class="grid">
         <div><label for="firmaNombre">Nombre en la firma</label><input id="firmaNombre" placeholder="Oscar Marín Fernández"></div>
         <div><label for="cargo">Cargo</label><input id="cargo"></div>
@@ -970,9 +970,8 @@ var CALLES = [["Avenida","Avenida 1 de Mayo","1 mayo","02006"],["Calle","Calle a
     return { nombre: nombre, cargo: insp.cargo || "", categoria: insp.catInsp || "", movil: insp.firmaMovil || "" };
   }
   function remitente(){
-    if(insp.remitente && !/t[eé]cnico de butanhogar\s*$/i.test(insp.remitente)) return insp.remitente;
-    var nom = (insp.firmaNombre || titulo(insp.insp)).split(/\s+/)[0];
-    return nom ? "Butanhogar · " + nom : "Butanhogar";
+    if(insp.remitente && !/t[eé]cnico de butanhogar\s*$|^butanhogar · /i.test(insp.remitente)) return insp.remitente;
+    return "BUTANHOGAR Mantenimiento";
   }
   function servicioListo(){ return /^https:\/\/script\.google(usercontent)?\.com\//.test(insp.svcUrl || "") && !!insp.svcKey; }
   function asunto(d){ return "Certificados de revisión – " + (d.titular || "Butanhogar"); }
