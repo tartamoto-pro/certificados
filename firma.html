@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Firma de correo Butanhogar</title>
+<meta name="robots" content="noindex">
+<style>
+:root{--bg:#f3f5f8;--card:#fff;--ink:#14202e;--muted:#5d6b7c;--line:#d9dfe7;--brand:#33466b;--accent:#e8701a;--field:#f8fafc}
+@media (prefers-color-scheme: dark){:root:not([data-theme="light"]){--bg:#0f141b;--card:#18202b;--ink:#e7edf4;--muted:#9aa8b8;--line:#2b3644;--brand:#9db4dc;--field:#111821}}
+:root[data-theme="dark"]{--bg:#0f141b;--card:#18202b;--ink:#e7edf4;--muted:#9aa8b8;--line:#2b3644;--brand:#9db4dc;--field:#111821}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:16px/1.45 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+main{max-width:820px;margin:0 auto;padding:20px 16px 60px}
+h1{font-size:1.3rem;margin:0 0 4px;color:var(--brand)}
+p.sub{margin:0 0 18px;color:var(--muted)}
+.card{background:var(--card);border:1px solid var(--line);border-radius:14px;padding:16px;margin-bottom:14px}
+label{display:block;font-size:.85rem;color:var(--muted);margin:10px 0 4px}
+input{width:100%;font:inherit;color:var(--ink);background:var(--field);border:1px solid var(--line);border-radius:10px;padding:10px 12px}
+.grid{display:grid;grid-template-columns:1fr 1fr;gap:0 12px}
+@media (max-width:560px){.grid{grid-template-columns:1fr}}
+.preview{background:#fff;border-radius:10px;padding:18px;overflow-x:auto;border:1px solid #e5e7eb}
+.btn{border:0;border-radius:12px;padding:13px 18px;font:700 1rem system-ui;cursor:pointer;background:var(--accent);color:#fff}
+.ok{color:#1f8a4c;font-weight:600;margin-left:10px}
+ol{padding-left:20px;margin:0}
+ol li{margin:6px 0}
+</style>
+</head>
+<body>
+<main>
+  <h1>Firma de correo</h1>
+  <p class="sub">Rellena tus datos, pulsa «Copiar firma» y pégala en Gmail desde el ordenador.</p>
+
+  <section class="card">
+    <div class="grid">
+      <div><label for="nombre">Nombre</label><input id="nombre" value="Oscar Marin Fernandez"></div>
+      <div><label for="cargo">Cargo</label><input id="cargo" value="Técnico instalador de gas"></div>
+      <div><label for="cat">Categoría</label><input id="cat" value="A"></div>
+      <div><label for="movil">Móvil (opcional)</label><input id="movil" type="tel"></div>
+    </div>
+  </section>
+
+  <section class="card">
+    <div class="preview" id="firma"></div>
+    <p style="margin:14px 0 0"><button class="btn" id="copiar" type="button">Copiar firma</button><span class="ok" id="ok"></span></p>
+  </section>
+
+  <section class="card">
+    <strong>Cómo ponerla en Gmail (en el ordenador)</strong>
+    <ol>
+      <li>Pulsa <b>Copiar firma</b>.</li>
+      <li>En Gmail, pulsa la rueda ⚙ → <b>Ver todos los ajustes</b> → pestaña <b>General</b> → apartado <b>Firma</b>.</li>
+      <li><b>Crear nueva</b>, ponle de nombre «Butanhogar», pincha en el recuadro y pega (Ctrl+V).</li>
+      <li>Debajo, en <b>Valores predeterminados de firma</b>, elige «Butanhogar» para <b>correos nuevos</b> y para <b>respuestas/reenvíos</b>.</li>
+      <li>Baja del todo y pulsa <b>Guardar cambios</b>.</li>
+    </ol>
+    <p style="margin:10px 0 0;color:var(--muted);font-size:.9rem">En el móvil sale sola: la app de Gmail usa la firma del ordenador si en la app no tienes puesta una «firma para móviles» (Ajustes → tu cuenta → déjala vacía).</p>
+  </section>
+</main>
+<script>
+(function(){
+  "use strict";
+  var LOGO = new URL("logo-firma.png", location.href).href;
+  var EMPRESA = { nombre: "BUTANHOGAR, S.L.", lema: "Gas y Calefacción", direccion: "Parque Empresarial Campollano – Avda. Octava Norte, s/n", ciudad: "02007 Albacete", telefono: "967 22 18 26", correo: "butanhogar@butanhogar.com" };
+  var AVISO = "Este mensaje y sus archivos adjuntos son confidenciales y van dirigidos exclusivamente a su destinatario. Si lo ha recibido por error, le rogamos que lo comunique al remitente y lo elimine.";
+  function esc(s){ return String(s || "").replace(/[&<>"']/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]; }); }
+  function v(id){ return document.getElementById(id).value.trim(); }
+  function html(){
+    var C = "#44546A", G = "#6b7280", F = "font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;";
+    var cargo = [v("cargo"), v("cat") ? "Categoría " + v("cat") : ""].filter(Boolean).map(esc).join(" · ");
+    var tel = "T. " + esc(EMPRESA.telefono) + (v("movil") ? " &nbsp;·&nbsp; M. " + esc(v("movil")) : "");
+    return '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>' +
+      '<td style="padding:4px 18px 4px 0;vertical-align:middle;"><img src="' + LOGO + '" width="160" alt="Butanhogar" style="display:block;width:160px;height:auto;border:0;"></td>' +
+      '<td style="padding:2px 0 2px 18px;border-left:3px solid #e8701a;vertical-align:middle;' + F + 'color:' + G + ';font-size:13px;line-height:1.5;">' +
+        '<div style="font-size:17px;font-weight:bold;color:' + C + ';">' + esc(v("nombre")) + '</div>' +
+        (cargo ? '<div style="color:' + C + ';">' + cargo + '</div>' : '') +
+        '<div style="margin-top:6px;font-weight:bold;color:' + C + ';">' + esc(EMPRESA.nombre) + ' &nbsp;·&nbsp; ' + esc(EMPRESA.lema) + '</div>' +
+        '<div>' + esc(EMPRESA.direccion) + ' · ' + esc(EMPRESA.ciudad) + '</div>' +
+        '<div>' + tel + ' &nbsp;·&nbsp; <a href="mailto:' + esc(EMPRESA.correo) + '" style="color:' + C + ';text-decoration:none;">' + esc(EMPRESA.correo) + '</a></div>' +
+      '</td></tr></table>' +
+      '<p style="margin:16px 0 0;max-width:560px;' + F + 'font-size:11px;line-height:1.4;color:#9ca3af;">' + esc(AVISO) + '</p>';
+  }
+  function pintar(){ document.getElementById("firma").innerHTML = html(); }
+  ["nombre", "cargo", "cat", "movil"].forEach(function(id){
+    var el = document.getElementById(id);
+    try{ var s = localStorage.getItem("bh_firma_" + id); if(s !== null) el.value = s; }catch(e){}
+    el.addEventListener("input", function(){ try{ localStorage.setItem("bh_firma_" + id, el.value); }catch(e){} pintar(); });
+  });
+  pintar();
+  document.getElementById("copiar").addEventListener("click", function(){
+    var ok = document.getElementById("ok"), h = html();
+    function hecho(){ ok.textContent = "✔ Copiada. Ahora pégala en Gmail."; }
+    if(navigator.clipboard && window.ClipboardItem){
+      navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([h], { type: "text/html" }), "text/plain": new Blob([document.getElementById("firma").innerText], { type: "text/plain" }) })])
+        .then(hecho, copiarSeleccion);
+    } else copiarSeleccion();
+    function copiarSeleccion(){
+      var r = document.createRange(), sel = window.getSelection();
+      r.selectNodeContents(document.getElementById("firma")); sel.removeAllRanges(); sel.addRange(r);
+      try{ document.execCommand("copy"); hecho(); }catch(e){ ok.textContent = "Selecciona la firma y copia con Ctrl+C."; }
+      sel.removeAllRanges();
+    }
+  });
+})();
+</script>
+</body>
+</html>
