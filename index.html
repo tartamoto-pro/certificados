@@ -80,7 +80,7 @@ input[readonly]{color:var(--muted)}
 .combo li{padding:11px 10px;border-radius:7px;cursor:pointer;font-size:.95rem}
 .combo li.act,.combo li:hover{background:var(--field)}
 .combo li b{color:var(--accent)}
-.combo li small{color:var(--muted);margin-left:6px}
+.combo li small{color:var(--muted);display:block;font-size:.8rem;margin-top:2px}
 </style>
 </head>
 <body>
@@ -101,7 +101,7 @@ input[readonly]{color:var(--muted)}
   <section class="card">
     <h2><span class="n">2</span>Datos del cliente</h2>
     <div class="grid">
-      <div><label for="titular">Titular del contrato *</label><input id="titular" autocomplete="off"></div>
+      <div><label for="titular">Titular del contrato *</label><div class="combo"><input id="titular" autocomplete="off" placeholder="Escribe el nombre: si ya es cliente, se rellena todo"></div></div>
       <div><label for="nif">NIF</label><input id="nif" autocomplete="off"></div>
       <div><label for="tel">Teléfono</label><input id="tel" type="tel"></div>
       <div><label for="movil">Teléfono móvil</label><input id="movil" type="tel"></div>
@@ -231,30 +231,32 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     return -1;
   }
   function esc(s){ return String(s).replace(/[&<>"]/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;" }[c]; }); }
-  function combo(input, getItems, onPick){
+  function lab(it){ return typeof it === "string" ? it : it.label; }
+  function combo(input, getItems, onPick, minChars){
     var wrap = input.parentNode, ul = null, items = [], act = -1;
     function close(){ if(ul){ ul.remove(); ul = null; } act = -1; }
     function render(){
       var q = norm(input.value.trim()), all = getItems();
+      if(q.length < (minChars || 0)){ close(); return; }
       if(!q) items = all.slice(0, 40);
       else {
         var hits = [];
-        all.forEach(function(it, idx){ var r = rank(it, q); if(r >= 0) hits.push([r, idx, it]); });
+        all.forEach(function(it, idx){ var r = rank(typeof it === "string" ? it : (it.buscar || it.label), q); if(r >= 0) hits.push([r, idx, it]); });
         hits.sort(function(a, b){ return a[0] - b[0] || a[1] - b[1]; });
         items = hits.map(function(h){ return h[2]; }).slice(0, 40);
       }
-      if(!items.length || (items.length === 1 && norm(items[0]) === q)){ close(); return; }
+      if(!items.length || (items.length === 1 && typeof items[0] === "string" && norm(items[0]) === q)){ close(); return; }
       if(!ul){ ul = document.createElement("ul"); wrap.appendChild(ul); }
       act = -1;
       ul.innerHTML = items.map(function(it){
-        return "<li>" + esc(it) + "</li>";
+        return "<li>" + esc(lab(it)) + (it.sub ? "<small>" + esc(it.sub) + "</small>" : "") + "</li>";
       }).join("");
       Array.prototype.forEach.call(ul.children, function(li, i){
         li.addEventListener("pointerdown", function(e){ e.preventDefault(); pick(i); });
       });
     }
     function pick(i){
-      var it = items[i]; input.value = it; close();
+      var it = items[i]; input.value = lab(it); close();
       if(onPick) onPick(it);
       input.dispatchEvent(new Event("change"));
     }
@@ -335,6 +337,36 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   }
   var TIPOS = ["Caldera","Encimera","Otros aparatos a gas"];
 
+  /* ---------- Clientes ya revisados (se guardan en este móvil al generar el certificado) ---------- */
+  var clientes = load("bh_clientes", {});
+  function claveCliente(d){ return d.nif ? "nif:" + norm(d.nif).replace(/[^a-z0-9]/g, "") : "tc:" + norm(d.titular) + "|" + norm(d.calle); }
+  function guardarCliente(d){
+    if(!d.titular) return;
+    var k = claveCliente(d);
+    delete clientes["tc:" + norm(d.titular) + "|" + norm(d.calle)];
+    clientes[k] = { titular: d.titular, nif: d.nif, tel: d.tel, movil: d.movil, email: d.email, calle: d.calle, poblacion: d.poblacion, cp: d.cp,
+      apps: d.apps, fecha: d.fecha };
+    store("bh_clientes", clientes);
+  }
+  function fechaCorta(f){ var p = String(f || "").split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : ""; }
+  function listaClientes(){
+    return Object.keys(clientes).map(function(k){ return clientes[k]; })
+      .sort(function(a, b){ return String(b.fecha).localeCompare(String(a.fecha)); })
+      .map(function(c){
+        var ap = (c.apps || []).map(function(a){ return [a.marca, a.modelo].filter(Boolean).join(" ") || a.tipo; }).filter(Boolean).join(", ");
+        return { label: c.titular, buscar: c.titular + " " + (c.nif || "") + " " + (c.calle || ""),
+          sub: [c.calle, c.poblacion].filter(Boolean).join(", ") + (ap ? " · " + ap : "") + (c.fecha ? " · última: " + fechaCorta(c.fecha) : ""), c: c };
+      });
+  }
+  function rellenarCliente(it){
+    var c = it.c; if(!c) return;
+    ["titular","nif","tel","movil","email","calle","poblacion","cp"].forEach(function(id){ $(id).value = c[id] || ""; });
+    cpAuto = false;
+    if(c.apps && c.apps.length){ appsBox.innerHTML = ""; c.apps.forEach(function(a){ addApp({ tipo: a.tipo, marca: a.marca, modelo: a.modelo, pot: a.pot }); }); }
+    toast("Datos de " + c.titular + " cargados (última revisión " + fechaCorta(c.fecha) + "). Revisa las mediciones de hoy.");
+    if(typeof guardar === "function") guardar();
+  }
+
   /* ---------- Aparatos ---------- */
   var MAX_APPS = 2;
   var appsBox = $("apps");
@@ -373,6 +405,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     }).filter(function(o){ return o.tipo || o.marca || o.modelo || o.pot || o.co; });
   }
   $("addApp").addEventListener("click", function(){ addApp(); });
+  combo($("titular"), listaClientes, rellenarCliente, 1);
   addApp({ tipo: "Caldera" });
 
   /* ---------- Checklist ---------- */
@@ -600,7 +633,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     if(!d.insp){ $("ajustes").open = true; $("insp").focus(); toast("Pon tu nombre de inspector (abajo del todo)."); return null; }
     if(!d.sigCli && !confirm("Falta la firma del cliente. ¿Generar el PDF igualmente?")) return null;
     if(!d.sigTec && !confirm("Falta tu firma. ¿Generar el PDF igualmente?")) return null;
-    aprender(d.apps);
+    aprender(d.apps); guardarCliente(d);
     var doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4", compress: true });
     doc.addFileToVFS("Carlito-Regular.ttf", FONT.r); doc.addFont("Carlito-Regular.ttf", "Carlito", "normal");
     doc.addFileToVFS("Carlito-Bold.ttf", FONT.b); doc.addFont("Carlito-Bold.ttf", "Carlito", "bold");
