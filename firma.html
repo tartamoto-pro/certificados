@@ -29,16 +29,7 @@ ol li{margin:6px 0}
 <body>
 <main>
   <h1>Firma de correo</h1>
-  <p class="sub">Rellena tus datos, pulsa «Copiar firma» y pégala en Gmail desde el ordenador.</p>
-
-  <section class="card">
-    <div class="grid">
-      <div><label for="nombre">Nombre</label><input id="nombre" value="Oscar Marin Fernandez"></div>
-      <div><label for="cargo">Cargo</label><input id="cargo" value="Técnico instalador de gas"></div>
-      <div><label for="cat">Categoría</label><input id="cat" value="A"></div>
-      <div><label for="movil">Móvil (opcional)</label><input id="movil" type="tel"></div>
-    </div>
-  </section>
+  <p class="sub">Pulsa «Copiar firma» y pégala en Gmail desde el ordenador.</p>
 
   <section class="card">
     <div class="preview" id="firma"></div>
@@ -60,46 +51,30 @@ ol li{margin:6px 0}
 <script>
 (function(){
   "use strict";
-  var LOGO = new URL("logo-firma.png", location.href).href;
-  var EMPRESA = { nombre: "BUTANHOGAR, S.L.", lema: "Gas y Calefacción", direccion: "Parque Empresarial Campollano – Avda. Octava Norte, s/n", ciudad: "02007 Albacete", telefono: "967 22 18 26", correo: "butanhogar@butanhogar.com" };
-  var AVISO = "Este mensaje y sus archivos adjuntos son confidenciales y van dirigidos exclusivamente a su destinatario. Si lo ha recibido por error, le rogamos que lo comunique al remitente y lo elimine.";
-  function esc(s){ return String(s || "").replace(/[&<>"']/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]; }); }
-  function v(id){ return document.getElementById(id).value.trim(); }
+  var IMG = new URL("firma-oscar.jpg", location.href).href;
+  var LEGAL = [
+    "BUTANHOGAR SLU garantiza la protección y confidencialidad de los datos personales que nos proporcionen de acuerdo con lo dispuesto en el Reglamento General de Protección de Datos de Carácter Personal (en adelante, RGPD), en la Ley Orgánica 3/2018, y en la Ley de Servicios de la Sociedad de la Información y Comercio Electrónico 34/2002 de 11 de Julio (LSSI-CE). Le informamos que su dirección de correo electrónico, así como el resto de los datos de carácter personal, tienen la finalidad de gestionar las comunicaciones y relaciones comerciales por vía electrónica. Usted podrá ejercer los derechos contemplados en los artículos 15 a 22 del RGPD en los términos establecidos en el mismo, contactando en la dirección P.E. CAMPOLLANO- AVDA 8ª NORTE, S/N, 02007, Albacete, o escribiendo un correo a butanhogar@butanhogar.com.",
+    "El contenido de esta comunicación, así como el de toda la documentación anexa, es confidencial y va dirigido únicamente al destinatario del mismo. En el supuesto de que usted no fuera el destinatario, le solicitamos que nos lo indique y no comunique su contenido a terceros, procediendo a su destrucción."
+  ];
+  function esc(s){ return String(s).replace(/[&<>"']/g, function(c){ return { "&":"&amp;", "<":"&lt;", ">":"&gt;", '"':"&quot;", "'":"&#39;" }[c]; }); }
   function html(){
-    var C = "#44546A", G = "#6b7280", F = "font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;";
-    var cargo = [v("cargo"), v("cat") ? "Categoría " + v("cat") : ""].filter(Boolean).map(esc).join(" · ");
-    var tel = "T. " + esc(EMPRESA.telefono) + (v("movil") ? " &nbsp;·&nbsp; M. " + esc(v("movil")) : "");
-    return '<table cellpadding="0" cellspacing="0" border="0" style="border-collapse:collapse;"><tr>' +
-      '<td style="padding:4px 18px 4px 0;vertical-align:middle;"><img src="' + LOGO + '" width="160" alt="Butanhogar" style="display:block;width:160px;height:auto;border:0;"></td>' +
-      '<td style="padding:2px 0 2px 18px;border-left:3px solid #e8701a;vertical-align:middle;' + F + 'color:' + G + ';font-size:13px;line-height:1.5;">' +
-        '<div style="font-size:17px;font-weight:bold;color:' + C + ';">' + esc(v("nombre")) + '</div>' +
-        (cargo ? '<div style="color:' + C + ';">' + cargo + '</div>' : '') +
-        '<div style="margin-top:6px;font-weight:bold;color:' + C + ';">' + esc(EMPRESA.nombre) + ' &nbsp;·&nbsp; ' + esc(EMPRESA.lema) + '</div>' +
-        '<div>' + esc(EMPRESA.direccion) + ' · ' + esc(EMPRESA.ciudad) + '</div>' +
-        '<div>' + tel + ' &nbsp;·&nbsp; <a href="mailto:' + esc(EMPRESA.correo) + '" style="color:' + C + ';text-decoration:none;">' + esc(EMPRESA.correo) + '</a></div>' +
-      '</td></tr></table>' +
-      '<p style="margin:16px 0 0;max-width:560px;' + F + 'font-size:11px;line-height:1.4;color:#9ca3af;">' + esc(AVISO) + '</p>';
+    var F = "font-family:Calibri,Carlito,'Segoe UI',Arial,sans-serif;";
+    return '<img src="' + IMG + '" width="560" alt="Oscar Marín Fernández · Butanhogar · 967 22 18 26" style="display:block;width:560px;max-width:100%;height:auto;border:0;margin:0 0 10px;">' +
+      LEGAL.map(function(t){ return '<p style="margin:0 0 6px;max-width:560px;text-align:justify;' + F + 'font-size:10.5px;line-height:1.35;color:#6b7280;">' + esc(t) + '</p>'; }).join("");
   }
-  function pintar(){ document.getElementById("firma").innerHTML = html(); }
-  ["nombre", "cargo", "cat", "movil"].forEach(function(id){
-    var el = document.getElementById(id);
-    try{ var s = localStorage.getItem("bh_firma_" + id); if(s !== null) el.value = s; }catch(e){}
-    el.addEventListener("input", function(){ try{ localStorage.setItem("bh_firma_" + id, el.value); }catch(e){} pintar(); });
-  });
-  pintar();
+  document.getElementById("firma").innerHTML = html();
   document.getElementById("copiar").addEventListener("click", function(){
     var ok = document.getElementById("ok"), h = html();
     function hecho(){ ok.textContent = "✔ Copiada. Ahora pégala en Gmail."; }
-    if(navigator.clipboard && window.ClipboardItem){
-      navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([h], { type: "text/html" }), "text/plain": new Blob([document.getElementById("firma").innerText], { type: "text/plain" }) })])
-        .then(hecho, copiarSeleccion);
-    } else copiarSeleccion();
     function copiarSeleccion(){
       var r = document.createRange(), sel = window.getSelection();
       r.selectNodeContents(document.getElementById("firma")); sel.removeAllRanges(); sel.addRange(r);
       try{ document.execCommand("copy"); hecho(); }catch(e){ ok.textContent = "Selecciona la firma y copia con Ctrl+C."; }
       sel.removeAllRanges();
     }
+    if(navigator.clipboard && window.ClipboardItem){
+      navigator.clipboard.write([new ClipboardItem({ "text/html": new Blob([h], { type: "text/html" }), "text/plain": new Blob([LEGAL.join("\n")], { type: "text/plain" }) })]).then(hecho, copiarSeleccion);
+    } else copiarSeleccion();
   });
 })();
 </script>
