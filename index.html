@@ -273,7 +273,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   };
   var MODELOS = {
     "Ariston": ["Clas One","Genus One","Alteas One","Cares S","Clas B One"],
-    "Baxi": ["Platinum Duo","Platinum Compact","Neodens Plus","Victoria Condens"],
+    "Baxi": ["Victoria 20/20 F","Victoria Condens 24/24 F","Platinum Compact 24/24 F","Platinum Duo","Neodens Plus 24/24 F","Novanox 24/24 F","Laura 20/20 F"],
     "Beretta": ["Mynute","Ciao"],
     "Bosch": ["Condens 2300i W","Condens 7000i W","Therm 4000 S","Therm 2000"],
     "Buderus": ["Logamax plus GB172"],
@@ -281,10 +281,10 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     "Cointra": ["Superlative","Optima"],
     "Ferroli": ["Bluehelix","Divacondens","Domiproject","Divatop"],
     "Immergas": ["Victrix"],
-    "Junkers": ["Cerapur","Cerapur Acu","Cerastar","Euroline","Hydronext"],
-    "Roca": ["Victoria","Victoria Plus","Victoria Condens","Neobit","Laura","Novanox"],
-    "Saunier Duval": ["Thema Condens","ThemaPlus Condens","Isofast Condens","Isotwin Condens","Thema","Opalia"],
-    "Vaillant": ["ecoTEC plus","ecoTEC pure","ecoTEC exclusive","turboTEC","atmoTEC"],
+    "Junkers": ["Cerapur","Cerapur Smart","Cerapur Comfort","Cerapur Acu","Ceraclass","Ceraclass Excellence","Cerastar","Euroline","Hydronext"],
+    "Roca": ["Victoria 20/20 F","Victoria 20/20 T","Victoria 24/24 F","Victoria Plus 24/24 F","Victoria Condens 24/24 F","Neobit 20/20 F","Neobit 24/24 F","Laura 20/20 F","Laura 20/20 T","Novanox 20/20 F","Novanox 24/24 F"],
+    "Saunier Duval": ["Thema Condens","ThemaPlus Condens","ThemaClassic","Thema","Isofast","Isofast Condens","Isotwin Condens","Semia","Opalia"],
+    "Vaillant": ["ecoTEC plus","ecoTEC pure","ecoTEC exclusive","turboTEC","turboTEC plus","atmoTEC","atmoTEC plus"],
     "Viessmann": ["Vitodens 100-W","Vitodens 111-W","Vitodens 200-W","Vitopend 100-W"],
     "Wolf": ["CGB-2"]
   };
@@ -608,8 +608,9 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     return null;
   }
   function saludo(d){ return "Hola" + (d.titular ? " " + d.titular : "") + ","; }
-  function mensaje(d){
-    return saludo(d) + " le enviamos los certificados de la revisión realizada hoy en " + d.calle + (d.poblacion ? " (" + d.poblacion + ")" : "") + ". Un saludo, Butanhogar Gas y Calefacción.";
+  function mensaje(d, extra){
+    return saludo(d) + "\n\nLe enviamos los certificados de la revisión realizada hoy en " + d.calle + (d.poblacion ? " (" + d.poblacion + ")" : "") + "." +
+      (extra ? "\n\n" + extra : "") + "\n\nUn saludo,\nButanhogar";
   }
   function abrir(url){ var w = window.open(url, "_blank"); if(!w) location.href = url; }
 
@@ -617,7 +618,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     var r = generar(); if(!r) return;
     var num = waNumber(r.d);
     descargar(r);
-    abrir("https://wa.me/" + (num || "") + "?text=" + encodeURIComponent(mensaje(r.d) + "\n\n(Le adjunto el PDF a continuación)"));
+    abrir("https://wa.me/" + (num || "") + "?text=" + encodeURIComponent(mensaje(r.d, "Le adjunto el PDF a continuación.")));
     toast(num ? "PDF descargado. En el chat del cliente pulsa el clip → Documento y elige el PDF." : "No hay móvil del cliente: elige el contacto en WhatsApp y adjunta el PDF descargado.");
     if(insp.oficina) setTimeout(function(){ toast("Recuerda: para la copia a la oficina usa el botón Correo."); }, 4000);
   });
@@ -627,7 +628,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     descargar(r);
     var to = r.d.email || insp.oficina || "";
     var cc = r.d.email && insp.oficina ? "&cc=" + insp.oficina.replace(/[^\w.@+\-]/g, "") : "";
-    var body = mensaje(r.d) + "\n\nAdjuntamos los certificados en PDF.";
+    var body = mensaje(r.d, "Adjuntamos los certificados en PDF.");
     location.href = "mailto:" + to.replace(/[^\w.@+\-,]/g, "") + "?subject=" + encodeURIComponent("Certificados de revisión – " + (r.d.titular || "Butanhogar")) + cc + "&body=" + encodeURIComponent(body);
     toast(r.d.email ? "PDF descargado. Adjúntalo en el correo (clip → Descargas) y envía." : "No hay correo del cliente: se abre solo con la oficina.");
   });
