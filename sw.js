@@ -1,6 +1,6 @@
 /* Servicio de la app: permite instalarla y que abra sin conexión.
    La página se pide siempre a internet primero, para que las actualizaciones lleguen enseguida. */
-const CACHE = 'certificados-v12';
+const CACHE = 'certificados-v13';
 const BASICOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'];
 

@@ -86,6 +86,12 @@ input[readonly]{color:var(--muted)}
 .full .acc{display:flex;gap:10px;padding:10px 14px calc(10px + env(safe-area-inset-bottom));border-top:1px solid #d9dfe7}
 .full .acc button{flex:1;border-radius:12px;padding:14px;font:700 1rem system-ui;border:1px solid #d9dfe7;background:#f8fafc;color:#14202e;cursor:pointer}
 .full .acc .okf{background:#1f8a4c;border-color:#1f8a4c;color:#fff;flex:2}
+.full.rot{inset:auto;left:0;top:0;transform-origin:0 0;transform:rotate(90deg) translateY(-100%)}
+.full.rot .top{padding:6px 14px;font-size:.95rem}
+.full.rot .acc{padding:6px 14px calc(6px + env(safe-area-inset-left))}
+.full.rot .acc button{padding:9px}
+.full.rot .linea{bottom:24%}
+.full.rot .hint{bottom:calc(24% - 26px)}
 .sigbtn{width:100%;border:0;border-radius:12px;padding:14px;font:700 1rem system-ui;background:var(--brand);color:var(--card);cursor:pointer;margin-bottom:10px}
 .tog.small{font-weight:500;min-width:0;margin-top:12px}
 .inrow{display:flex;gap:8px}
@@ -735,14 +741,14 @@ var CALLES = [["Avenida","Avenida 1 de Mayo","1 mayo","02006"],["Calle","Calle a
   /* ---------- Firmas ---------- */
   /* La firma se guarda como trazos (coordenadas relativas) y se redibuja exacta
      aunque cambie el tamaño de pantalla (p. ej. al abrirse el teclado). */
-  function Pad(canvas, onEnd){
+  function Pad(canvas, onEnd, girado){
     var ctx = canvas.getContext("2d"), strokes = [], cur = null, cw = 0, ch = 0, dpr = 1;
     function setup(){
-      var r = canvas.getBoundingClientRect();
-      if(r.width < 2 || r.height < 2) return;
+      var w = canvas.offsetWidth, hh = canvas.offsetHeight;
+      if(w < 2 || hh < 2) return;
       var d = window.devicePixelRatio || 1;
-      if(Math.round(r.width) === cw && Math.round(r.height) === ch && d === dpr) return;
-      cw = Math.round(r.width); ch = Math.round(r.height); dpr = d;
+      if(Math.round(w) === cw && Math.round(hh) === ch && d === dpr) return;
+      cw = Math.round(w); ch = Math.round(hh); dpr = d;
       canvas.width = Math.round(cw * dpr); canvas.height = Math.round(ch * dpr);
       redraw();
     }
@@ -758,7 +764,12 @@ var CALLES = [["Avenida","Avenida 1 de Mayo","1 mayo","02006"],["Calle","Calle a
       strokes.forEach(function(s){ drawStroke(ctx, s, cw, ch); });
       hint(!strokes.length);
     }
-    function pos(e){ var r = canvas.getBoundingClientRect(); return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height]; }
+    function pos(e){
+      var r = canvas.getBoundingClientRect();
+      /* lienzo girado 90º: el ancho del lienzo va hacia abajo en la pantalla */
+      if(girado && girado()) return [(e.clientY - r.top) / r.height, (r.right - e.clientX) / r.width];
+      return [(e.clientX - r.left) / r.width, (e.clientY - r.top) / r.height];
+    }
     canvas.addEventListener("pointerdown", function(e){
       e.preventDefault(); setup(); cur = [pos(e)]; strokes.push(cur);
       try{ canvas.setPointerCapture(e.pointerId); }catch(_){}
@@ -809,15 +820,24 @@ var CALLES = [["Avenida","Avenida 1 de Mayo","1 mayo","02006"],["Calle","Calle a
   });
 
   /* Firma del cliente a pantalla completa: se firma en grande y luego se encaja en el recuadro. */
-  var padFull = Pad($("sigFull"));
+  var padFull = Pad($("sigFull"), null, function(){ return $("full").classList.contains("rot"); });
   function cerrarFull(){ $("full").classList.remove("on"); document.body.style.overflow = ""; }
+  /* Con el móvil en vertical, la zona de firma se dibuja girada para firmar en horizontal
+     (sin el modo pantalla completa del navegador, que muestra un aviso). */
+  function ajustarFull(){
+    var el = $("full"), vertical = window.innerHeight > window.innerWidth;
+    el.classList.toggle("rot", vertical);
+    el.style.width = vertical ? window.innerHeight + "px" : "";
+    el.style.height = vertical ? window.innerWidth + "px" : "";
+    padFull.refresh();
+  }
   $("firmarGrande").addEventListener("click", function(){
     $("fullNombre").textContent = val("firmante") || val("titular");
     $("full").classList.add("on");
     document.body.style.overflow = "hidden";
-    padFull.clear(); padFull.refresh();
+    padFull.clear(); ajustarFull();
   });
-  window.addEventListener("resize", function(){ if($("full").classList.contains("on") && padFull.empty()) padFull.refresh(); });
+  window.addEventListener("resize", function(){ if($("full").classList.contains("on")) ajustarFull(); });
   $("fullClear").addEventListener("click", function(){ padFull.clear(); });
   $("fullCancel").addEventListener("click", cerrarFull);
   $("fullOk").addEventListener("click", function(){
