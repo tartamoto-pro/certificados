@@ -352,8 +352,11 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     var ahora = new Date();
     encolar({ accion: "guardarCliente",
       cliente: Object.assign({ clave: k, claveAntigua: antigua !== k ? antigua : "", ultimaRevision: d.fecha, tecnico: d.insp }, c),
-      revision: { cuando: d.fecha + " " + ("0" + ahora.getHours()).slice(-2) + ":" + ("0" + ahora.getMinutes()).slice(-2), certificados: certs } });
+      revision: { id: rid(), cuando: d.fecha + " " + ("0" + ahora.getHours()).slice(-2) + ":" + ("0" + ahora.getMinutes()).slice(-2), certificados: certs } });
   }
+  /* Identificador de la visita en curso: aunque se genere el PDF varias veces, cuenta como una sola revisión. */
+  function rid(){ var r = load("bh_rid", null); if(!r){ r = hoy() + "-" + Math.random().toString(36).slice(2, 8); store("bh_rid", r); } return r; }
+  function nuevoRid(){ try{ localStorage.removeItem("bh_rid"); }catch(e){} }
 
   /* Copia en la hoja de Google del script: no se pierde al cambiar de móvil.
      Si no hay cobertura, se guarda en cola y se sube en cuanto vuelve. */
@@ -364,7 +367,12 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
       .then(function(j){ if(!j || !j.ok) throw new Error(j && j.error ? j.error : "respuesta no válida"); return j; });
   }
   var enviandoCola = false;
-  function encolar(op){ var c = load("bh_cola", []); c.push(op); store("bh_cola", c); enviarCola(); }
+  function encolar(op){
+    var c = load("bh_cola", []);
+    if(op.revision) c = c.filter(function(x){ return !(x.revision && x.revision.id === op.revision.id); });
+    c.push(op); if(c.length > 300) c = c.slice(-300);
+    store("bh_cola", c); enviarCola();
+  }
   function enviarCola(){
     if(enviandoCola || !servicioListo() || navigator.onLine === false) return;
     var c = load("bh_cola", []); if(!c.length) return;
@@ -376,14 +384,17 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   function bajarClientes(aviso){
     if(!servicioListo() || navigator.onLine === false) return;
     postServicio({ accion: "clientes" }).then(function(j){
-      var n = 0;
+      var n = 0, nuevos = {};
       (j.clientes || []).forEach(function(c){
-        var l = clientes[c.clave];
-        if(!l || String(c.fecha || "") >= String(l.fecha || "")){
-          clientes[c.clave] = { titular: c.titular, nif: c.nif, tel: c.tel, movil: c.movil, email: c.email, calle: c.calle, poblacion: c.poblacion, cp: c.cp, apps: c.apps || [], fecha: c.fecha };
-        }
+        nuevos[c.clave] = { titular: c.titular, nif: c.nif, tel: c.tel, movil: c.movil, email: c.email, calle: c.calle, poblacion: c.poblacion, cp: c.cp, apps: c.apps || [], fecha: c.fecha };
         n++;
       });
+      load("bh_cola", []).forEach(function(op){
+        if(!op.cliente) return;
+        if(op.cliente.claveAntigua) delete nuevos[op.cliente.claveAntigua];
+        if(clientes[op.cliente.clave]) nuevos[op.cliente.clave] = clientes[op.cliente.clave];
+      });
+      clientes = nuevos;
       store("bh_clientes", clientes);
       if(aviso) toast(n + " clientes cargados de la hoja de Google.");
     }, function(e){ if(aviso) toast("No se pudieron cargar los clientes (" + e.message + ")."); });
@@ -403,6 +414,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   }
   function rellenarCliente(it){
     var c = it.c; if(!c) return;
+    if(hayVisita() && confirm("Hay mediciones o una firma de otra revisión en pantalla. ¿Borrarlas para empezar la de " + c.titular + "?")) resetVisita();
     ["titular","nif","tel","movil","email","calle","poblacion","cp"].forEach(function(id){ $(id).value = c[id] || ""; });
     cpAuto = false;
     if(c.apps && c.apps.length){ appsBox.innerHTML = ""; c.apps.forEach(function(a){ addApp({ tipo: a.tipo, marca: a.marca, modelo: a.modelo, pot: a.pot }); }); }
@@ -673,6 +685,8 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     guardarYa();
     var d = datos();
     if(!d.titular || !d.calle){ toast("Falta el titular o la calle."); return null; }
+    if(d.cp && !/^\d{5}$/.test(d.cp)){ $("cp").focus(); toast("El código postal debe tener 5 cifras."); return null; }
+    if(d.email && !/^[^@\s,;]+@[^@\s,;]+\.[^@\s,;]+$/.test(d.email)){ $("email").focus(); toast("El correo del cliente no parece correcto. Revísalo."); return null; }
     if(!d.insp){ $("ajustes").open = true; $("insp").focus(); toast("Pon tu nombre de inspector (abajo del todo)."); return null; }
     if(!d.sigCli && !confirm("Falta la firma del cliente. ¿Generar el PDF igualmente?")) return null;
     if(!d.sigTec && !confirm("Falta tu firma. ¿Generar el PDF igualmente?")) return null;
@@ -796,13 +810,19 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   function guardarYa(){
     clearTimeout(tGuardar);
     (function(){
-      var o = { v: {}, apps: getApps(), checks: checks, gas: $("doGas").checked, ter: $("doTer").checked, sig: padCli.strokes(), cpAuto: cpAuto };
+      var o = { dia: hoy(), v: {}, apps: getApps(), checks: checks, gas: $("doGas").checked, ter: $("doTer").checked, sig: padCli.strokes(), cpAuto: cpAuto };
       CAMPOS.forEach(function(id){ o.v[id] = $(id).value; });
       store("bh_borrador", o);
     })();
   }
   function restaurar(){
     var o = load("bh_borrador", null); if(!o) return;
+    var conDatos = o.v && (o.v.titular || o.v.calle) || (o.sig && o.sig.length);
+    if(conDatos && o.dia && o.dia !== hoy() &&
+       !confirm("Hay una revisión sin cerrar del " + fechaCorta(o.dia) + (o.v.titular ? " (" + o.v.titular + ")" : "") + ".\n\nAceptar: seguir con ella.\nCancelar: empezar una nueva.")){
+      try{ localStorage.removeItem("bh_borrador"); }catch(e){}
+      nuevoRid(); return;
+    }
     CAMPOS.forEach(function(id){ if(o.v && o.v[id] != null) $(id).value = o.v[id]; });
     if(o.apps && o.apps.length){ appsBox.innerHTML = ""; o.apps.forEach(function(a){ addApp(a); }); }
     if(o.checks) Object.keys(o.checks).forEach(function(k){
@@ -826,14 +846,28 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   window.addEventListener("pagehide", guardarYa);
   document.addEventListener("visibilitychange", function(){ if(document.hidden) guardarYa(); });
 
+  /* Datos que son de la visita de hoy (no del cliente): mediciones, comprobaciones, observaciones y firma */
+  var VISITA = ["coAmb","m","n","o","pCO","pCO2","q","r","otros","obs","firmante"];
+  function hayVisita(){
+    return !padCli.empty() || VISITA.some(function(id){ return val(id); }) || getApps().some(function(a){ return a.co; });
+  }
+  function resetVisita(){
+    VISITA.forEach(function(id){ $(id).value = ""; });
+    $("mUnit").value = "bar";
+    Array.prototype.forEach.call(appsBox.querySelectorAll('input[data-k="co"]'), function(i){ i.value = ""; });
+    Object.keys(checks).forEach(function(k){
+      var def = RITE.filter(function(it){ return it[0] === k; })[0][2]; checks[k] = def;
+      var seg = box.querySelector('.seg[data-k="' + k + '"]');
+      if(seg) Array.prototype.forEach.call(seg.children, function(x){ x.classList.toggle("on", x.textContent === def); });
+    });
+    padCli.clear(); nuevoRid();
+  }
   $("nueva").addEventListener("click", function(){
     if(!confirm("¿Vaciar los datos del cliente para una nueva revisión?")) return;
-    ["titular","nif","tel","movil","email","calle","poblacion","cp","coAmb","m","n","o","pCO","pCO2","q","r","otros","obs","firmante"]
-      .forEach(function(id){ $(id).value = ""; });
+    ["titular","nif","tel","movil","email","calle","poblacion","cp"].forEach(function(id){ $(id).value = ""; });
     appsBox.innerHTML = ""; addApp({ tipo: "Caldera" });
-    padCli.clear(); cpAuto = false;
-    Object.keys(checks).forEach(function(k){ var def = RITE.filter(function(it){ return it[0] === k; })[0][2]; checks[k] = def;
-      var seg = box.querySelector('.seg[data-k="' + k + '"]'); if(seg) Array.prototype.forEach.call(seg.children, function(x){ x.classList.toggle("on", x.textContent === def); }); });
+    resetVisita(); cpAuto = false;
+    $("doGas").checked = true; $("doTer").checked = true; syncTer();
     try{ localStorage.removeItem("bh_borrador"); }catch(e){}
     setTimeout(function(){ try{ localStorage.removeItem("bh_borrador"); }catch(e){} }, 300);
     window.scrollTo({ top: 0, behavior: "smooth" });
