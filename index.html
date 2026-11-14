@@ -253,7 +253,18 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
 
   /* ---------- Poblaciones de la provincia de Albacete ---------- */
   var PUEBLOS = ["Albacete","Abengibre","Alatoz","Albatana","Alborea","Alcadozo","Alcalá del Júcar","Alcaraz","Almansa","Alpera","Ayna","Balazote","Balsa de Ves","El Ballestero","Barrax","Bienservida","Bogarra","Bonete","El Bonillo","Carcelén","Casas de Juan Núñez","Casas de Lázaro","Casas de Ves","Casas-Ibáñez","Caudete","Cenizate","Chinchilla de Monte-Aragón","Corral-Rubio","Cotillas","Elche de la Sierra","Férez","Fuensanta","Fuente-Álamo","Fuentealbilla","La Gineta","Golosalvo","Hellín","La Herrera","Higueruela","Hoya-Gonzalo","Jorquera","Letur","Lezuza","Liétor","Madrigueras","Mahora","Masegoso","Minaya","Molinicos","Montalvos","Montealegre del Castillo","Motilleja","Munera","Navas de Jorquera","Nerpio","Ontur","Ossa de Montiel","Paterna del Madera","Peñas de San Pedro","Peñascosa","Pétrola","Povedilla","Pozo Cañada","Pozo-Lorente","Pozohondo","Pozuelo","La Recueja","Riópar","Robledo","La Roda","Salobre","San Pedro","Socovos","Tarazona de la Mancha","Tobarra","Valdeganga","Vianos","Villa de Ves","Villalgordo del Júcar","Villamalea","Villapalacios","Villarrobledo","Villatoya","Villavaliente","Villaverde de Guadalimar","Viveros","Yeste"];
-  combo($("poblacion"), function(){ return PUEBLOS; });
+  /* C.P. principal de cada municipio (Albacete capital no: depende de la calle) */
+  var CP = {};
+  "Abengibre:02250|Alatoz:02152|Albatana:02653|Alborea:02215|Alcadozo:02124|Alcalá del Júcar:02210|Alcaraz:02300|Almansa:02640|Alpera:02690|Ayna:02125|Balazote:02320|El Ballestero:02614|Balsa de Ves:02214|Barrax:02639|Bienservida:02360|Bogarra:02130|Bonete:02691|El Bonillo:02610|Carcelén:02153|Casas de Juan Núñez:02151|Casas de Lázaro:02329|Casas de Ves:02212|Casas-Ibáñez:02200|Caudete:02660|Cenizate:02247|Chinchilla de Monte-Aragón:02520|Corral-Rubio:02693|Cotillas:02461|Elche de la Sierra:02430|Férez:02436|Fuensanta:02637|Fuente-Álamo:02651|Fuentealbilla:02260|La Gineta:02110|Golosalvo:02253|Hellín:02400|La Herrera:02162|Higueruela:02694|Hoya-Gonzalo:02696|Jorquera:02248|Letur:02434|Lezuza:02160|Liétor:02410|Madrigueras:02230|Mahora:02240|Masegoso:02314|Minaya:02620|Molinicos:02440|Montalvos:02638|Montealegre del Castillo:02650|Motilleja:02220|Munera:02612|Navas de Jorquera:02246|Nerpio:02530|Ontur:02652|Ossa de Montiel:02611|Paterna del Madera:02136|Peñas de San Pedro:02120|Peñascosa:02313|Pétrola:02692|Povedilla:02311|Pozo Cañada:02510|Pozohondo:02141|Pozo-Lorente:02154|Pozuelo:02327|La Recueja:02249|Riópar:02450|Robledo:02340|La Roda:02630|Salobre:02316|San Pedro:02326|Socovos:02435|Tarazona de la Mancha:02100|Tobarra:02500|Valdeganga:02150|Vianos:02315|Villa de Ves:02213|Villalgordo del Júcar:02636|Villamalea:02270|Villapalacios:02350|Villarrobledo:02600|Villatoya:02215|Villavaliente:02154|Villaverde de Guadalimar:02460|Viveros:02310|Yeste:02480".split("|").forEach(function(s){ var i = s.lastIndexOf(":"); CP[norm(s.slice(0, i))] = s.slice(i + 1); });
+  var cpAuto = false;
+  function ponerCP(){
+    var k = norm(val("poblacion")), cp = CP[k];
+    if(k === "albacete"){ if(cpAuto || !val("cp")){ $("cp").value = "020"; cpAuto = true; } $("cp").focus(); return; }
+    if(cp && (cpAuto || !val("cp"))){ $("cp").value = cp; cpAuto = true; }
+  }
+  $("cp").addEventListener("input", function(){ cpAuto = false; });
+  $("poblacion").addEventListener("change", ponerCP);
+  combo($("poblacion"), function(){ return PUEBLOS; }, ponerCP);
 
   /* ---------- Marcas y modelos ---------- */
   var MARCAS = {
@@ -452,7 +463,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
       }
     };
   }
-  var padCli = Pad($("sigCli"));
+  var padCli = Pad($("sigCli"), function(){ guardar(); });
   var padTec = Pad($("sigTec"), function(){ store("bh_sigTec2", padTec.empty() ? null : padTec.strokes()); });
   var savedTec = load("bh_sigTec2", null); if(savedTec) padTec.load(savedTec);
   Array.prototype.forEach.call(document.querySelectorAll("[data-clear]"), function(b){
@@ -621,12 +632,47 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     toast(r.d.email ? "PDF descargado. Adjúntalo en el correo (clip → Descargas) y envía." : "No hay correo del cliente: se abre solo con la oficina.");
   });
 
+  /* ---------- Borrador: se guarda solo para no perder nada al ir a WhatsApp y volver ---------- */
+  var CAMPOS = ["titular","nif","tel","movil","email","calle","poblacion","cp","coAmb","m","n","o","pCO","pCO2","q","r","otros","obs","firmante"], tGuardar = null;
+  function guardar(){
+    clearTimeout(tGuardar);
+    tGuardar = setTimeout(function(){
+      var o = { v: {}, apps: getApps(), checks: checks, gas: $("doGas").checked, ter: $("doTer").checked, sig: padCli.strokes(), cpAuto: cpAuto };
+      CAMPOS.forEach(function(id){ o.v[id] = $(id).value; });
+      store("bh_borrador", o);
+    }, 250);
+  }
+  function restaurar(){
+    var o = load("bh_borrador", null); if(!o) return;
+    CAMPOS.forEach(function(id){ if(o.v && o.v[id] != null) $(id).value = o.v[id]; });
+    if(o.apps && o.apps.length){ appsBox.innerHTML = ""; o.apps.forEach(function(a){ addApp(a); }); }
+    if(o.checks) Object.keys(o.checks).forEach(function(k){
+      if(!(k in checks)) return; checks[k] = o.checks[k];
+      var seg = box.querySelector('.seg[data-k="' + k + '"]');
+      if(seg) Array.prototype.forEach.call(seg.children, function(x){ x.classList.toggle("on", x.textContent === o.checks[k]); });
+    });
+    $("doGas").checked = o.gas !== false; $("doTer").checked = o.ter !== false; syncTer();
+    if(o.sig && o.sig.length) padCli.load(o.sig);
+    cpAuto = !!o.cpAuto;
+  }
+  restaurar();
+  document.querySelector("main").addEventListener("input", guardar);
+  document.querySelector("main").addEventListener("change", guardar);
+  document.querySelector("main").addEventListener("click", function(){ setTimeout(guardar, 0); });
+  window.addEventListener("pagehide", function(){ clearTimeout(tGuardar); tGuardar = null; guardar(); });
+  document.addEventListener("visibilitychange", function(){ if(document.hidden) guardar(); });
+
   $("nueva").addEventListener("click", function(){
     if(!confirm("¿Vaciar los datos del cliente para una nueva revisión?")) return;
     ["titular","nif","tel","movil","email","calle","poblacion","cp","coAmb","m","n","o","pCO","pCO2","q","r","otros","obs","firmante"]
       .forEach(function(id){ $(id).value = ""; });
     appsBox.innerHTML = ""; addApp({ tipo: "Caldera" });
-    padCli.clear(); window.scrollTo({ top: 0, behavior: "smooth" });
+    padCli.clear(); cpAuto = false;
+    Object.keys(checks).forEach(function(k){ var def = RITE.filter(function(it){ return it[0] === k; })[0][2]; checks[k] = def;
+      var seg = box.querySelector('.seg[data-k="' + k + '"]'); if(seg) Array.prototype.forEach.call(seg.children, function(x){ x.classList.toggle("on", x.textContent === def); }); });
+    try{ localStorage.removeItem("bh_borrador"); }catch(e){}
+    setTimeout(function(){ try{ localStorage.removeItem("bh_borrador"); }catch(e){} }, 300);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   });
 })();
 </script>
