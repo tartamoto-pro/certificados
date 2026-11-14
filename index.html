@@ -342,12 +342,55 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   function claveCliente(d){ return d.nif ? "nif:" + norm(d.nif).replace(/[^a-z0-9]/g, "") : "tc:" + norm(d.titular) + "|" + norm(d.calle); }
   function guardarCliente(d){
     if(!d.titular) return;
-    var k = claveCliente(d);
-    delete clientes["tc:" + norm(d.titular) + "|" + norm(d.calle)];
-    clientes[k] = { titular: d.titular, nif: d.nif, tel: d.tel, movil: d.movil, email: d.email, calle: d.calle, poblacion: d.poblacion, cp: d.cp,
-      apps: d.apps, fecha: d.fecha };
+    var k = claveCliente(d), antigua = "tc:" + norm(d.titular) + "|" + norm(d.calle);
+    delete clientes[antigua];
+    var c = { titular: d.titular, nif: d.nif, tel: d.tel, movil: d.movil, email: d.email, calle: d.calle, poblacion: d.poblacion, cp: d.cp,
+      apps: (d.apps || []).map(function(a){ return { tipo: a.tipo, marca: a.marca, modelo: a.modelo, pot: a.pot }; }), fecha: d.fecha };
+    clientes[k] = c;
     store("bh_clientes", clientes);
+    var certs = [$("doGas").checked ? "Gas" : "", $("doTer").checked ? "Térmica" : ""].filter(Boolean).join(" + ");
+    var ahora = new Date();
+    encolar({ accion: "guardarCliente",
+      cliente: Object.assign({ clave: k, claveAntigua: antigua !== k ? antigua : "", ultimaRevision: d.fecha, tecnico: d.insp }, c),
+      revision: { cuando: d.fecha + " " + ("0" + ahora.getHours()).slice(-2) + ":" + ("0" + ahora.getMinutes()).slice(-2), certificados: certs } });
   }
+
+  /* Copia en la hoja de Google del script: no se pierde al cambiar de móvil.
+     Si no hay cobertura, se guarda en cola y se sube en cuanto vuelve. */
+  function postServicio(obj){
+    return fetch(insp.svcUrl, { method: "POST", redirect: "follow", headers: { "Content-Type": "text/plain;charset=utf-8" },
+      body: JSON.stringify(Object.assign({ clave: insp.svcKey }, obj)) })
+      .then(function(r){ return r.json(); })
+      .then(function(j){ if(!j || !j.ok) throw new Error(j && j.error ? j.error : "respuesta no válida"); return j; });
+  }
+  var enviandoCola = false;
+  function encolar(op){ var c = load("bh_cola", []); c.push(op); store("bh_cola", c); enviarCola(); }
+  function enviarCola(){
+    if(enviandoCola || !servicioListo() || navigator.onLine === false) return;
+    var c = load("bh_cola", []); if(!c.length) return;
+    enviandoCola = true;
+    postServicio(c[0]).then(function(){
+      var c2 = load("bh_cola", []); c2.shift(); store("bh_cola", c2); enviandoCola = false; enviarCola();
+    }, function(){ enviandoCola = false; });
+  }
+  function bajarClientes(aviso){
+    if(!servicioListo() || navigator.onLine === false) return;
+    postServicio({ accion: "clientes" }).then(function(j){
+      var n = 0;
+      (j.clientes || []).forEach(function(c){
+        var l = clientes[c.clave];
+        if(!l || String(c.fecha || "") >= String(l.fecha || "")){
+          clientes[c.clave] = { titular: c.titular, nif: c.nif, tel: c.tel, movil: c.movil, email: c.email, calle: c.calle, poblacion: c.poblacion, cp: c.cp, apps: c.apps || [], fecha: c.fecha };
+        }
+        n++;
+      });
+      store("bh_clientes", clientes);
+      if(aviso) toast(n + " clientes cargados de la hoja de Google.");
+    }, function(e){ if(aviso) toast("No se pudieron cargar los clientes (" + e.message + ")."); });
+  }
+  window.addEventListener("online", function(){ enviarCola(); bajarClientes(); });
+  setTimeout(function(){ enviarCola(); bajarClientes(); }, 1500);
+  ["svcUrl", "svcKey"].forEach(function(id){ $(id).addEventListener("change", function(){ setTimeout(function(){ bajarClientes(true); enviarCola(); }, 200); }); });
   function fechaCorta(f){ var p = String(f || "").split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : ""; }
   function listaClientes(){
     return Object.keys(clientes).map(function(k){ return clientes[k]; })
