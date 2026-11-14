@@ -108,6 +108,7 @@ input[readonly]{color:var(--muted)}
       <label class="tog"><input type="checkbox" id="doGas" checked> Instalación receptora individual</label>
       <label class="tog"><input type="checkbox" id="doTer" checked> Mantenimiento instalación térmica</label>
     </div>
+    <label class="tog small" style="margin-top:10px"><input type="checkbox" id="prueba"> Revisión de prueba (no guardar el cliente ni la revisión)</label>
   </section>
 
   <section class="card">
@@ -120,7 +121,12 @@ input[readonly]{color:var(--muted)}
     </div>
     <label for="email">Correo electrónico</label><input id="email" type="email">
     <h3>Dirección de la instalación</h3>
-    <label for="calle">Calle *</label><input id="calle" placeholder="Calle, número, piso">
+    <label for="calle">Calle y número *</label><input id="calle" placeholder="Ej.: Calle Tinte, 10" autocomplete="off">
+    <div class="grid3">
+      <div><label for="portal">Portal</label><input id="portal" autocomplete="off"></div>
+      <div><label for="escalera">Escalera</label><input id="escalera" autocomplete="off"></div>
+      <div><label for="piso">Piso</label><input id="piso" autocomplete="off" placeholder="Ej.: 3º A"></div>
+    </div>
     <div class="grid3">
       <div><label for="poblacion">Población</label><div class="combo"><input id="poblacion" autocomplete="off" placeholder="Escribe: c → Caudete, Chinchilla…"></div></div>
       <div><label for="cp">C.P.</label><input id="cp" inputmode="numeric" maxlength="5"></div>
@@ -310,9 +316,50 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
   var cpAuto = false;
   function ponerCP(){
     var k = norm(val("poblacion")), cp = CP[k];
-    if(k === "albacete"){ if(cpAuto || !val("cp")){ $("cp").value = "020"; cpAuto = true; } $("cp").focus(); return; }
+    if(k === "albacete"){
+      if(cpAuto || !val("cp")){ $("cp").value = ""; cpAuto = true; }
+      buscarCPCapital(); return;
+    }
     if(cp && (cpAuto || !val("cp"))){ $("cp").value = cp; cpAuto = true; }
   }
+  /* En Albacete capital el C.P. depende de la calle y el número: se consulta al callejero oficial
+     (CartoCiudad, Instituto Geográfico Nacional) cuando hay calle con número. */
+  var cpPeticion = 0;
+  function jsonp(url, ms){
+    return new Promise(function(ok, ko){
+      var cb = "bhcp" + Date.now() + Math.floor(Math.random() * 1e4), s = document.createElement("script"), t;
+      function fin(){ clearTimeout(t); try{ delete window[cb]; }catch(e){ window[cb] = undefined; } s.remove(); }
+      window[cb] = function(d){ fin(); ok(d); };
+      s.onerror = function(){ fin(); ko(new Error("sin conexión")); };
+      t = setTimeout(function(){ fin(); ko(new Error("tiempo agotado")); }, ms || 8000);
+      s.src = url + (url.indexOf("?") < 0 ? "?" : "&") + "callback=" + cb;
+      document.head.appendChild(s);
+    });
+  }
+  function buscarCPCapital(){
+    if(norm(val("poblacion")) !== "albacete") return;
+    var calle = val("calle"), m = calle.match(/(\d+)\s*[a-zA-Z]?\s*$/) || calle.match(/(\d+)/);
+    if(!m || !(cpAuto || !val("cp"))) return;
+    var num = parseInt(m[1], 10), id = ++cpPeticion;
+    var q = calle.replace(/\bn[ºo°]\.?\s*/i, " ") + ", Albacete";
+    jsonp("https://www.cartociudad.es/geocoder/api/geocoder/candidatesJsonp?limit=20&q=" + encodeURIComponent(q)).then(function(lista){
+      if(id !== cpPeticion || !(cpAuto || !val("cp"))) return;
+      var aqui = (Array.isArray(lista) ? lista : []).filter(function(x){ return x.muniCode === "02003" && norm(x.poblacion || "") === "albacete" && x.postalCode; });
+      var exacto = aqui.filter(function(x){ return x.portalNumber === num; })[0];
+      var cps = aqui.map(function(x){ return x.postalCode; }).filter(function(c, i, a){ return a.indexOf(c) === i; });
+      var cp = exacto ? exacto.postalCode : (cps.length === 1 ? cps[0] : "");
+      if(cp){
+        $("cp").value = cp; cpAuto = true; guardar();
+        toast("C.P. " + cp + (exacto ? "" : " (de esa calle, comprueba el número)") + " según el callejero oficial.");
+      } else if(aqui.length || calle.length > 6){
+        if(cpAuto){ $("cp").value = ""; guardar(); }
+        toast("No encuentro el C.P. de esa dirección: escríbelo a mano.");
+      }
+    }, function(){ /* sin cobertura: se pone a mano */ });
+  }
+  var tCalle = null;
+  $("calle").addEventListener("input", function(){ clearTimeout(tCalle); tCalle = setTimeout(buscarCPCapital, 1200); });
+  $("calle").addEventListener("change", function(){ clearTimeout(tCalle); buscarCPCapital(); });
   $("cp").addEventListener("input", function(){ cpAuto = false; });
   $("poblacion").addEventListener("change", ponerCP);
   combo($("poblacion"), function(){ return PUEBLOS; }, ponerCP);
@@ -372,7 +419,7 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
     if(!d.titular) return;
     var k = claveCliente(d), antigua = "tc:" + norm(d.titular) + "|" + norm(d.calle);
     delete clientes[antigua];
-    var c = { titular: d.titular, nif: d.nif, tel: d.tel, movil: d.movil, email: d.email, calle: d.calle, poblacion: d.poblacion, cp: d.cp,
+    var c = { titular: d.titular, nif: d.nif, tel: d.tel, movil: d.movil, email: d.email, calle: d.calle, portal: d.portal, escalera: d.escalera, piso: d.piso, poblacion: d.poblacion, cp: d.cp,
       apps: (d.apps || []).map(function(a){ return { tipo: a.tipo, marca: a.marca, modelo: a.modelo, pot: a.pot }; }), fecha: d.fecha };
     clientes[k] = c;
     store("bh_clientes", clientes);
@@ -414,7 +461,11 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
     postServicio({ accion: "clientes" }).then(function(j){
       var n = 0, nuevos = {};
       (j.clientes || []).forEach(function(c){
-        nuevos[c.clave] = { titular: c.titular, nif: c.nif, tel: c.tel, movil: c.movil, email: c.email, calle: c.calle, poblacion: c.poblacion, cp: c.cp, apps: c.apps || [], fecha: c.fecha };
+        var srv = { titular: c.titular, nif: c.nif, tel: c.tel, movil: c.movil, email: c.email, calle: c.calle, portal: c.portal, escalera: c.escalera, piso: c.piso, poblacion: c.poblacion, cp: c.cp, apps: c.apps || [], fecha: c.fecha };
+        /* si la hoja todavía no tiene portal/escalera/piso, se conservan los de este móvil */
+        var loc = clientes[c.clave] || {};
+        ["portal", "escalera", "piso"].forEach(function(k){ if(srv[k] === undefined) srv[k] = loc[k] || ""; });
+        nuevos[c.clave] = srv;
         n++;
       });
       load("bh_cola", []).forEach(function(op){
@@ -430,6 +481,12 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
   window.addEventListener("online", function(){ enviarCola(); bajarClientes(); });
   setTimeout(function(){ enviarCola(); bajarClientes(); }, 1500);
   ["svcUrl", "svcKey"].forEach(function(id){ $(id).addEventListener("change", function(){ setTimeout(function(){ bajarClientes(true); enviarCola(); }, 200); }); });
+  /* Dirección para el certificado y los mensajes: calle y nº + portal, escalera y piso */
+  function dirCompleta(d){
+    var piso = (d.piso || "").trim();
+    if(/^\d+$/.test(piso)) piso += "º";
+    return [d.calle, d.portal ? "Portal " + d.portal : "", d.escalera ? "Esc. " + d.escalera : "", piso].filter(Boolean).join(", ");
+  }
   function fechaCorta(f){ var p = String(f || "").split("-"); return p.length === 3 ? p[2] + "/" + p[1] + "/" + p[0] : ""; }
   function listaClientes(){
     return Object.keys(clientes).map(function(k){ return clientes[k]; })
@@ -437,13 +494,13 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
       .map(function(c){
         var ap = (c.apps || []).map(function(a){ return [a.marca, a.modelo].filter(Boolean).join(" ") || a.tipo; }).filter(Boolean).join(", ");
         return { label: c.titular, buscar: c.titular + " " + (c.nif || "") + " " + (c.calle || ""),
-          sub: [c.calle, c.poblacion].filter(Boolean).join(", ") + (ap ? " · " + ap : "") + (c.fecha ? " · última: " + fechaCorta(c.fecha) : ""), c: c };
+          sub: [dirCompleta(c), c.poblacion].filter(Boolean).join(", ") + (ap ? " · " + ap : "") + (c.fecha ? " · última: " + fechaCorta(c.fecha) : ""), c: c };
       });
   }
   function rellenarCliente(it){
     var c = it.c; if(!c) return;
     if(hayVisita() && confirm("Hay mediciones o una firma de otra revisión en pantalla. ¿Borrarlas para empezar la de " + c.titular + "?")) resetVisita();
-    ["titular","nif","tel","movil","email","calle","poblacion","cp"].forEach(function(id){ $(id).value = c[id] || ""; });
+    ["titular","nif","tel","movil","email","calle","portal","escalera","piso","poblacion","cp"].forEach(function(id){ $(id).value = c[id] || ""; });
     cpAuto = false;
     if(c.apps && c.apps.length){ appsBox.innerHTML = ""; c.apps.forEach(function(a){ addApp({ tipo: a.tipo, marca: a.marca, modelo: a.modelo, pot: a.pot }); }); }
     toast("Datos de " + c.titular + " cargados (última revisión " + fechaCorta(c.fecha) + "). Revisa las mediciones de hoy.");
@@ -693,7 +750,7 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
     var F = L.fields;
     /* coAmb y o) ya llevan "ppm" y "(ºC)" impresos en la plantilla */
     var U = { m: d.mUnit || "bar", n: "ºC", pCO: "ppm", pCO2: "%", r: "%" };
-    function v(k){ return U[k] ? unit(d[k], U[k]) : d[k]; }
+    function v(k){ return k === "calle" ? dirCompleta(d) : (U[k] ? unit(d[k], U[k]) : d[k]); }
     ["titular","nif","tel","movil","email","calle","poblacion","cp","provincia","insp","catInsp","coAmb","lugar","dia","mes","anyo"].forEach(function(k){
       if(F[k]) put(doc, F[k], v(k));
     });
@@ -743,12 +800,12 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
     var poblacion = val("poblacion");
     return {
       titular: val("titular"), nif: val("nif"), tel: val("tel"), movil: val("movil"), email: val("email"),
-      calle: val("calle"), poblacion: poblacion, cp: val("cp"), provincia: val("provincia"),
+      calle: val("calle"), portal: val("portal"), escalera: val("escalera"), piso: val("piso"), poblacion: poblacion, cp: val("cp"), provincia: val("provincia"),
       insp: val("insp"), catInsp: val("catInsp"), coAmb: val("coAmb"),
       m: val("m"), mUnit: $("mUnit").value, n: val("n"), o: val("o"), pCO: val("pCO"), pCO2: val("pCO2"), q: val("q"), r: val("r"), otros: val("otros"),
       obs: ($("obs").value || "").trim(),
       lugar: poblacion, dia: String(parseInt(f[2], 10)), mes: MESES[parseInt(f[1], 10) - 1], anyo: f[0].slice(2),
-      fecha: fecha, firmante: val("firmante"), apps: getApps(),
+      fecha: fecha, firmante: val("firmante"), apps: getApps(), prueba: $("prueba").checked,
       sigCli: padCli.image(), sigTec: padTec.image(), cuno: !!insp.cuno
     };
   }
@@ -765,7 +822,7 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
     if(!d.insp){ $("ajustes").open = true; $("insp").focus(); toast("Pon tu nombre de inspector (abajo del todo)."); return null; }
     if(!d.sigCli && !confirm("Falta la firma del cliente. ¿Generar el PDF igualmente?")) return null;
     if(!d.sigTec && !confirm("Falta tu firma. ¿Generar el PDF igualmente?")) return null;
-    aprender(d.apps); guardarCliente(d);
+    if(!d.prueba){ aprender(d.apps); guardarCliente(d); }
     var doc = new window.jspdf.jsPDF({ unit: "mm", format: "a4", compress: true });
     doc.addFileToVFS("Carlito-Regular.ttf", FONT.r); doc.addFont("Carlito-Regular.ttf", "Carlito", "normal");
     doc.addFileToVFS("Carlito-Bold.ttf", FONT.b); doc.addFont("Carlito-Bold.ttf", "Carlito", "bold");
@@ -797,7 +854,7 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
   }
   function saludo(d){ return "Hola" + (d.titular ? " " + d.titular : "") + ","; }
   function mensaje(d, extra, sinCierre){
-    return saludo(d) + "\n\nLe enviamos los certificados de la revisión realizada hoy en " + d.calle + (d.poblacion ? " (" + d.poblacion + ")" : "") + "." +
+    return saludo(d) + "\n\nLe enviamos los certificados de la revisión realizada hoy en " + dirCompleta(d) + (d.poblacion ? " (" + d.poblacion + ")" : "") + "." +
       (extra ? "\n\n" + extra : "") + (sinCierre ? "" : "\n\nUn saludo,\nButanhogar");
   }
   function abrir(url){ var w = window.open(url, "_blank"); if(!w) location.href = url; }
@@ -840,7 +897,7 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
     var aviso = num ? "En el chat del cliente pulsa el clip → Documento y elige el PDF más reciente." : "No hay móvil del cliente: elige el contacto en WhatsApp y adjunta el PDF.";
     if(servicioListo() && insp.oficina){
       ocupado(true); toast("Enviando copia a la oficina…");
-      var copia = "Copia del certificado enviado por WhatsApp a " + (r.d.titular || "") + " (" + (r.d.movil || r.d.tel || "sin móvil") + "), " + r.d.calle + (r.d.poblacion ? ", " + r.d.poblacion : "") + ".\nTécnico: " + (r.d.insp || "");
+      var copia = "Copia del certificado enviado por WhatsApp a " + (r.d.titular || "") + " (" + (r.d.movil || r.d.tel || "sin móvil") + "), " + dirCompleta(r.d) + (r.d.poblacion ? ", " + r.d.poblacion : "") + ".\nTécnico: " + (r.d.insp || "");
       enviarServicio(r, insp.oficina, false, copia).then(function(){
         toast("Copia enviada a la oficina. " + aviso);
       }, function(e){
@@ -877,7 +934,7 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
   });
 
   /* ---------- Borrador: se guarda solo para no perder nada al ir a WhatsApp y volver ---------- */
-  var CAMPOS = ["mUnit","titular","nif","tel","movil","email","calle","poblacion","cp","coAmb","m","n","o","pCO","pCO2","q","r","otros","obs","firmante"], tGuardar = null;
+  var CAMPOS = ["mUnit","titular","nif","tel","movil","email","calle","portal","escalera","piso","poblacion","cp","coAmb","m","n","o","pCO","pCO2","q","r","otros","obs","firmante"], tGuardar = null;
   function guardar(){
     clearTimeout(tGuardar);
     tGuardar = setTimeout(guardarYa, 250);
@@ -885,7 +942,7 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
   function guardarYa(){
     clearTimeout(tGuardar);
     (function(){
-      var o = { dia: hoy(), v: {}, apps: getApps(), checks: checks, gas: $("doGas").checked, ter: $("doTer").checked, sig: padCli.strokes(), cpAuto: cpAuto };
+      var o = { dia: hoy(), prueba: $("prueba").checked, v: {}, apps: getApps(), checks: checks, gas: $("doGas").checked, ter: $("doTer").checked, sig: padCli.strokes(), cpAuto: cpAuto };
       CAMPOS.forEach(function(id){ o.v[id] = $(id).value; });
       store("bh_borrador", o);
     })();
@@ -907,7 +964,7 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
     });
     $("doGas").checked = o.gas !== false; $("doTer").checked = o.ter !== false; syncTer();
     if(o.sig && o.sig.length) padCli.load(o.sig);
-    cpAuto = !!o.cpAuto;
+    cpAuto = !!o.cpAuto; $("prueba").checked = !!o.prueba;
   }
   $("qSign").addEventListener("click", function(){
     var v = $("q").value.trim();
@@ -939,7 +996,8 @@ var STAMP = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAjAAAAE8CAYAAADe24uJA
   }
   $("nueva").addEventListener("click", function(){
     if(!confirm("¿Vaciar los datos del cliente para una nueva revisión?")) return;
-    ["titular","nif","tel","movil","email","calle","poblacion","cp"].forEach(function(id){ $(id).value = ""; });
+    ["titular","nif","tel","movil","email","calle","portal","escalera","piso","poblacion","cp"].forEach(function(id){ $(id).value = ""; });
+    $("prueba").checked = false;
     appsBox.innerHTML = ""; addApp({ tipo: "Caldera" });
     resetVisita(); cpAuto = false;
     $("doGas").checked = true; $("doTer").checked = true; syncTer();
