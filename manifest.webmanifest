@@ -1,6 +1,6 @@
 {
-  "name": "Certificados Butanhogar",
-  "short_name": "Certificados",
+  "name": "Mantenimiento Butanhogar",
+  "short_name": "Mantenimiento",
   "description": "Certificados de revisión de gas y térmica: rellenar, firmar y enviar.",
   "id": "./",
   "start_url": "./",
