@@ -66,6 +66,10 @@ details summary{cursor:pointer;color:var(--brand);font-weight:600}
 .toast.show{opacity:1}
 input[readonly]{color:var(--muted)}
 .combo{position:relative}
+.inrow{display:flex;gap:8px}
+.inrow input{flex:1;min-width:0}
+.inrow select{width:auto;flex:0 0 84px}
+.inrow .mini{flex:0 0 56px;font-size:1rem}
 .combo ul{position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:10;margin:0;padding:4px;list-style:none;background:var(--card);border:1px solid var(--line);border-radius:10px;box-shadow:0 8px 24px rgba(0,0,0,.18);max-height:280px;overflow-y:auto}
 .combo li{padding:11px 10px;border-radius:7px;cursor:pointer;font-size:.95rem}
 .combo li.act,.combo li:hover{background:var(--field)}
@@ -123,13 +127,13 @@ input[readonly]{color:var(--muted)}
     <div id="checks"></div>
     <h3>Gestión energética: medición y registro (20 kW &lt; P &lt; 70 kW)</h3>
     <div class="grid">
-      <div><label for="m">m) Temp./presión fluido portador entrada</label><input id="m" placeholder="Ej.: 1,3 bar"></div>
+      <div><label for="m">m) Temp./presión fluido portador entrada</label><div class="inrow"><input id="m" inputmode="decimal" placeholder="Ej.: 1,3"><select id="mUnit" aria-label="Unidad"><option>bar</option><option>ºC</option></select></div></div>
       <div><label for="n">n) Temp. ambiente local / sala (ºC)</label><input id="n" inputmode="decimal"></div>
       <div><label for="o">o) Temp. gases combustión (ºC)</label><input id="o" inputmode="decimal"></div>
-      <div><label for="q">q) Tiro en la caja de humos</label><input id="q"></div>
-      <div><label for="pCO">p) Contenido de CO (ppm)</label><input id="pCO"></div>
-      <div><label for="pCO2">p) Contenido de CO2 (%)</label><input id="pCO2"></div>
-      <div><label for="r">r) Rendimiento (%)</label><input id="r"></div>
+      <div><label for="q">q) Tiro en la caja de humos</label><div class="inrow"><input id="q" inputmode="decimal"><button class="mini" type="button" id="qSign" aria-label="Cambiar signo">+/−</button></div></div>
+      <div><label for="pCO">p) Contenido de CO (ppm)</label><input id="pCO" inputmode="decimal"></div>
+      <div><label for="pCO2">p) Contenido de CO2 (%)</label><input id="pCO2" inputmode="decimal"></div>
+      <div><label for="r">r) Rendimiento (%)</label><input id="r" inputmode="decimal"></div>
       <div><label for="otros">Otros</label><input id="otros"></div>
     </div>
   </section>
@@ -513,7 +517,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     doc.setTextColor(INK[0], INK[1], INK[2]);
     var F = L.fields;
     /* coAmb y o) ya llevan "ppm" y "(ºC)" impresos en la plantilla */
-    var U = { n: "ºC", pCO: "ppm", pCO2: "%", r: "%" };
+    var U = { m: d.mUnit || "bar", n: "ºC", pCO: "ppm", pCO2: "%", r: "%" };
     function v(k){ return U[k] ? unit(d[k], U[k]) : d[k]; }
     ["titular","nif","tel","movil","email","calle","poblacion","cp","provincia","insp","catInsp","coAmb","lugar","dia","mes","anyo"].forEach(function(k){
       if(F[k]) put(doc, F[k], v(k));
@@ -561,7 +565,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
       titular: val("titular"), nif: val("nif"), tel: val("tel"), movil: val("movil"), email: val("email"),
       calle: val("calle"), poblacion: poblacion, cp: val("cp"), provincia: val("provincia"),
       insp: val("insp"), catInsp: val("catInsp"), coAmb: val("coAmb"),
-      m: val("m"), n: val("n"), o: val("o"), pCO: val("pCO"), pCO2: val("pCO2"), q: val("q"), r: val("r"), otros: val("otros"),
+      m: val("m"), mUnit: $("mUnit").value, n: val("n"), o: val("o"), pCO: val("pCO"), pCO2: val("pCO2"), q: val("q"), r: val("r"), otros: val("otros"),
       obs: ($("obs").value || "").trim(),
       lugar: poblacion, dia: String(parseInt(f[2], 10)), mes: MESES[parseInt(f[1], 10) - 1], anyo: f[0].slice(2),
       fecha: fecha, firmante: val("firmante"), apps: getApps(),
@@ -573,6 +577,7 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     if(!window.jspdf){ toast("No se pudo cargar el generador de PDF. Revisa la conexión a internet."); return null; }
     var gas = $("doGas").checked, ter = $("doTer").checked;
     if(!gas && !ter){ toast("Marca al menos un certificado."); return null; }
+    guardarYa();
     var d = datos();
     if(!d.titular || !d.calle){ toast("Falta el titular o la calle."); return null; }
     if(!d.insp){ $("ajustes").open = true; $("insp").focus(); toast("Pon tu nombre de inspector (abajo del todo)."); return null; }
@@ -585,7 +590,8 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     var first = true;
     if(gas){ drawCert(doc, "gas", d); first = false; }
     if(ter){ if(!first) doc.addPage(); drawCert(doc, "ter", d); }
-    var nombre = ("Certificados_" + d.titular + "_" + d.fecha).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9_-]+/g, "_") + ".pdf";
+    var ahora = new Date(), hhmm = ("0" + ahora.getHours()).slice(-2) + ("0" + ahora.getMinutes()).slice(-2) + ("0" + ahora.getSeconds()).slice(-2);
+    var nombre = ("Certificados_" + d.titular + "_" + d.fecha + "_" + hhmm).normalize("NFD").replace(/[\u0300-\u036f]/g, "").replace(/[^A-Za-z0-9_-]+/g, "_") + ".pdf";
     return { doc: doc, nombre: nombre, d: d };
   }
 
@@ -634,14 +640,18 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
   });
 
   /* ---------- Borrador: se guarda solo para no perder nada al ir a WhatsApp y volver ---------- */
-  var CAMPOS = ["titular","nif","tel","movil","email","calle","poblacion","cp","coAmb","m","n","o","pCO","pCO2","q","r","otros","obs","firmante"], tGuardar = null;
+  var CAMPOS = ["mUnit","titular","nif","tel","movil","email","calle","poblacion","cp","coAmb","m","n","o","pCO","pCO2","q","r","otros","obs","firmante"], tGuardar = null;
   function guardar(){
     clearTimeout(tGuardar);
-    tGuardar = setTimeout(function(){
+    tGuardar = setTimeout(guardarYa, 250);
+  }
+  function guardarYa(){
+    clearTimeout(tGuardar);
+    (function(){
       var o = { v: {}, apps: getApps(), checks: checks, gas: $("doGas").checked, ter: $("doTer").checked, sig: padCli.strokes(), cpAuto: cpAuto };
       CAMPOS.forEach(function(id){ o.v[id] = $(id).value; });
       store("bh_borrador", o);
-    }, 250);
+    })();
   }
   function restaurar(){
     var o = load("bh_borrador", null); if(!o) return;
@@ -656,12 +666,17 @@ var FONT = { r: "AAEAAAAOAIAAAwBgR0RFRg14DYgAAG4YAAAAoEdQT1NtgInmAABuuAAANOJHU1V
     if(o.sig && o.sig.length) padCli.load(o.sig);
     cpAuto = !!o.cpAuto;
   }
+  $("qSign").addEventListener("click", function(){
+    var v = $("q").value.trim();
+    $("q").value = v.charAt(0) === "-" ? v.slice(1) : "-" + v;
+    guardar();
+  });
   restaurar();
   document.querySelector("main").addEventListener("input", guardar);
   document.querySelector("main").addEventListener("change", guardar);
   document.querySelector("main").addEventListener("click", function(){ setTimeout(guardar, 0); });
-  window.addEventListener("pagehide", function(){ clearTimeout(tGuardar); tGuardar = null; guardar(); });
-  document.addEventListener("visibilitychange", function(){ if(document.hidden) guardar(); });
+  window.addEventListener("pagehide", guardarYa);
+  document.addEventListener("visibilitychange", function(){ if(document.hidden) guardarYa(); });
 
   $("nueva").addEventListener("click", function(){
     if(!confirm("¿Vaciar los datos del cliente para una nueva revisión?")) return;
