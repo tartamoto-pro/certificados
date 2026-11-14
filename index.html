@@ -173,8 +173,11 @@ input[readonly]{color:var(--muted)}
     <div class="sig"><canvas id="sigCli"></canvas><button class="mini clear" type="button" data-clear="cli">Borrar</button><span class="hint">Firme aquí con el dedo</span></div>
     <label for="firmante">Nombre de quien firma (si no es el titular)</label>
     <input id="firmante">
-    <label style="margin-top:16px">Por el inspector / instalador autorizado <span style="font-size:.78rem">(se guarda en este móvil)</span></label>
-    <div class="sig"><canvas id="sigTec"></canvas><button class="mini clear" type="button" data-clear="tec">Borrar</button><span class="hint">Tu firma</span></div>
+    <div id="tecWrap">
+      <label style="margin-top:16px">Tu firma (inspector / instalador) <span style="font-size:.78rem">· se hace una vez y queda guardada</span></label>
+      <div class="sig"><canvas id="sigTec"></canvas><button class="mini clear" type="button" data-clear="tec">Borrar</button><span class="hint">Tu firma</span></div>
+      <button class="mini" type="button" id="tecOk" style="margin-top:8px">Guardar mi firma</button>
+    </div>
   </section>
 
   <section class="card">
@@ -190,13 +193,14 @@ input[readonly]{color:var(--muted)}
       <label for="svcKey">Clave de envío</label><input id="svcKey" autocomplete="off">
       <p class="note">Con estos dos datos, el botón Correo envía el PDF solo, y al enviar por WhatsApp la oficina recibe su copia por correo. Sin ellos, se abre la app de correo como antes.</p>
       <h3>Firma del correo</h3>
-      <label for="remitente">Nombre del remitente (lo que ve el cliente)</label><input id="remitente" placeholder="Oscar · Técnico de Butanhogar">
+      <label for="remitente">Nombre del remitente (lo que ve el cliente)</label><input id="remitente" placeholder="Butanhogar · Oscar">
       <div class="grid">
         <div><label for="firmaNombre">Nombre en la firma</label><input id="firmaNombre" placeholder="Oscar Marín Fernández"></div>
         <div><label for="cargo">Cargo</label><input id="cargo"></div>
       </div>
       <label for="firmaMovil">Móvil en la firma (opcional)</label><input id="firmaMovil" type="tel">
       <label class="tog small"><input type="checkbox" id="cuno"> Poner el cuño de la empresa junto a mi firma</label>
+      <p style="margin:10px 0 0"><button class="mini" type="button" id="tecCambiar">Volver a hacer mi firma</button></p>
       <p class="note">Se guarda en este móvil. Cada técnico pone aquí su nombre y su firma una sola vez.</p>
     </details>
   </section>
@@ -763,27 +767,26 @@ var CALLES = [["Avenida","Avenida 1 de Mayo","1 mayo","02006"],["Calle","Calle a
   var padCli = Pad($("sigCli"), function(){ guardar(); });
   var padTec = Pad($("sigTec"), function(){ store("bh_sigTec2", padTec.empty() ? null : padTec.strokes()); });
   var savedTec = load("bh_sigTec2", null); if(savedTec) padTec.load(savedTec);
+  function verTec(mostrar){ $("tecWrap").style.display = mostrar ? "" : "none"; if(mostrar) setTimeout(function(){ padTec.refresh(); }, 30); }
+  verTec(!savedTec);
+  $("tecOk").addEventListener("click", function(){
+    if(padTec.empty()){ toast("Haz tu firma en el recuadro."); return; }
+    store("bh_sigTec2", padTec.strokes()); verTec(false); toast("Tu firma queda guardada para todos los certificados.");
+  });
+  $("tecCambiar").addEventListener("click", function(){
+    verTec(true); $("tecWrap").scrollIntoView({ behavior: "smooth", block: "center" });
+  });
 
   /* Firma del cliente a pantalla completa: se firma en grande y luego se encaja en el recuadro. */
   var padFull = Pad($("sigFull"));
-  function cerrarFull(){
-    $("full").classList.remove("on");
-    try{ if(screen.orientation && screen.orientation.unlock) screen.orientation.unlock(); }catch(e){}
-    try{ if(document.fullscreenElement) document.exitFullscreen(); }catch(e){}
-  }
+  function cerrarFull(){ $("full").classList.remove("on"); document.body.style.overflow = ""; }
   $("firmarGrande").addEventListener("click", function(){
     $("fullNombre").textContent = val("firmante") || val("titular");
     $("full").classList.add("on");
+    document.body.style.overflow = "hidden";
     padFull.clear(); padFull.refresh();
-    /* si el móvil lo permite, pantalla completa y en horizontal para tener más sitio */
-    try{
-      var el = $("full");
-      if(el.requestFullscreen) el.requestFullscreen().then(function(){
-        if(screen.orientation && screen.orientation.lock) return screen.orientation.lock("landscape");
-      }).catch(function(){}).then(function(){ setTimeout(function(){ padFull.refresh(); }, 350); });
-    }catch(e){}
   });
-  document.addEventListener("fullscreenchange", function(){ setTimeout(function(){ if($("full").classList.contains("on") && padFull.empty()) padFull.refresh(); }, 200); });
+  window.addEventListener("resize", function(){ if($("full").classList.contains("on") && padFull.empty()) padFull.refresh(); });
   $("fullClear").addEventListener("click", function(){ padFull.clear(); });
   $("fullCancel").addEventListener("click", cerrarFull);
   $("fullOk").addEventListener("click", function(){
@@ -967,13 +970,17 @@ var CALLES = [["Avenida","Avenida 1 de Mayo","1 mayo","02006"],["Calle","Calle a
     return { nombre: nombre, cargo: insp.cargo || "", categoria: insp.catInsp || "", movil: insp.firmaMovil || "" };
   }
   function remitente(){
-    if(insp.remitente) return insp.remitente;
+    if(insp.remitente && !/t[eé]cnico de butanhogar\s*$/i.test(insp.remitente)) return insp.remitente;
     var nom = (insp.firmaNombre || titulo(insp.insp)).split(/\s+/)[0];
-    return nom ? nom + " · Técnico de Butanhogar" : "Butanhogar";
+    return nom ? "Butanhogar · " + nom : "Butanhogar";
   }
   function servicioListo(){ return /^https:\/\/script\.google(usercontent)?\.com\//.test(insp.svcUrl || "") && !!insp.svcKey; }
   function asunto(d){ return "Certificados de revisión – " + (d.titular || "Butanhogar"); }
   function enviarServicio(r, para, copiaOficina, cuerpo){
+    try{ return enviarServicio2(r, para, copiaOficina, cuerpo); }
+    catch(e){ return Promise.reject(e); }
+  }
+  function enviarServicio2(r, para, copiaOficina, cuerpo){
     var texto = cuerpo + "\n\nUn saludo,\nButanhogar";
     var pdf = r.doc.output("datauristring").split(",")[1];
     var ctrl = window.AbortController ? new AbortController() : null;
