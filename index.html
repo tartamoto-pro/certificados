@@ -115,7 +115,7 @@ input[readonly]{color:var(--muted)}
     <h2><span class="n">1</span>Datos del cliente</h2>
     <div class="grid">
       <div><label for="titular">Titular del contrato *</label><div class="combo"><input id="titular" autocomplete="off" placeholder="Escribe el nombre: si ya es cliente, se rellena todo"></div></div>
-      <div><label for="nif">NIF</label><input id="nif" autocomplete="off"></div>
+      <div><label for="nif">NIF</label><div class="inrow"><input id="nif" autocomplete="off" inputmode="numeric" placeholder="Nº de DNI: la letra sale sola"><button class="mini" type="button" id="nifAbc" aria-label="Teclado con letras">ABC</button></div></div>
       <div><label for="tel">Teléfono</label><input id="tel" type="tel"></div>
       <div><label for="movil">Teléfono móvil</label><input id="movil" type="tel"></div>
     </div>
@@ -589,6 +589,28 @@ var CALLES = [["Avenida","Avenida 1 de Mayo","1 mayo","02006"],["Calle","Calle a
   window.addEventListener("online", function(){ enviarCola(); bajarClientes(); });
   setTimeout(function(){ enviarCola(); bajarClientes(); }, 1500);
   ["svcUrl", "svcKey"].forEach(function(id){ $(id).addEventListener("change", function(){ setTimeout(function(){ bajarClientes(true); enviarCola(); }, 200); }); });
+  /* NIF: teclado numérico; con los 8 números del DNI se añade la letra sola.
+     Para NIE o CIF (empiezan por letra) el botón ABC cambia al teclado normal. */
+  var LETRAS_DNI = "TRWAGMYFPDXBNJZSQVHLCKE";
+  function letraDNI(){
+    var v = $("nif").value.replace(/[\s.\-]/g, "");
+    if(/^\d{8}$/.test(v)){ $("nif").value = v + LETRAS_DNI.charAt(parseInt(v, 10) % 23); guardar(); }
+  }
+  $("nif").addEventListener("input", function(){ if(/^\d{8}$/.test($("nif").value.replace(/[\s.\-]/g, ""))) letraDNI(); });
+  var cambiandoTeclado = false;
+  $("nif").addEventListener("blur", function(){
+    if(cambiandoTeclado) return;
+    letraDNI(); $("nif").setAttribute("inputmode", "numeric"); $("nifAbc").textContent = "ABC";
+  });
+  $("nifAbc").addEventListener("pointerdown", function(e){ e.preventDefault(); });
+  $("nifAbc").addEventListener("click", function(){
+    var num = $("nif").getAttribute("inputmode") === "numeric";
+    $("nif").setAttribute("inputmode", num ? "text" : "numeric");
+    $("nifAbc").textContent = num ? "123" : "ABC";
+    cambiandoTeclado = true; $("nif").blur();
+    setTimeout(function(){ $("nif").focus(); cambiandoTeclado = false; }, 60);
+  });
+
   /* Dirección para el certificado y los mensajes: calle y nº + portal, escalera y piso */
   function dirCompleta(d){
     var piso = (d.piso || "").trim();
