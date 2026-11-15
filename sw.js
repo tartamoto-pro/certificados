@@ -1,7 +1,7 @@
 /* Servicio de la app: permite instalarla y que abra sin conexión.
    La página se pide a internet primero (para que las actualizaciones lleguen enseguida),
    pero si la cobertura es mala, a los 3 segundos se abre la copia guardada. */
-const CACHE = 'certificados-v23';
+const CACHE = 'certificados-v24';
 const BASICOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'];
 
@@ -11,7 +11,9 @@ self.addEventListener('install', e => {
   self.skipWaiting();
 });
 self.addEventListener('activate', e => {
-  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k)))).then(() => self.clients.claim()));
+  e.waitUntil(caches.keys().then(ks => Promise.all(ks.filter(k => k !== CACHE).map(k => caches.delete(k))))
+    .then(() => self.clients.claim()));
+  // la página, al notar el cambio de servicio, se recarga sola con la versión nueva
 });
 
 function guardar(req, res) {
