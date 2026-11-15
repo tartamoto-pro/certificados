@@ -1,7 +1,7 @@
 /* Servicio de la app: permite instalarla y que abra sin conexión.
    La página se pide a internet primero (para que las actualizaciones lleguen enseguida),
    pero si la cobertura es mala, a los 3 segundos se abre la copia guardada. */
-const CACHE = 'certificados-v54';
+const CACHE = 'certificados-v55';
 const BASICOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'];
 
@@ -46,7 +46,7 @@ self.addEventListener('fetch', e => {
     return;
   }
   e.respondWith((async () => {
-    const red = fetch(req).then(res => guardar(req, res));
+    const red = fetch(req).then(res => url.search ? res : guardar(req, res));  // un aviso compartido (?text=…) no se guarda como copia
     const copia = await caches.match(req, { ignoreSearch: true }) || await caches.match('./index.html');
     if (!copia) return red;
     // con copia guardada: la red tiene 3 s; si no responde, se usa la copia y la red actualiza por detrás
