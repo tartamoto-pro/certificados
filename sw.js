@@ -1,7 +1,7 @@
 /* Servicio de la app: permite instalarla y que abra sin conexión.
    La página se pide a internet primero (para que las actualizaciones lleguen enseguida),
    pero si la cobertura es mala, a los 3 segundos se abre la copia guardada. */
-const CACHE = 'certificados-v22';
+const CACHE = 'certificados-v23';
 const BASICOS = ['./', './index.html', './manifest.webmanifest', './icon-192.png', './icon-512.png',
   'https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js'];
 
@@ -26,6 +26,19 @@ self.addEventListener('fetch', e => {
   const propio = url.origin === location.origin;
   const libreria = url.hostname === 'cdnjs.cloudflare.com';
   if (!propio && !libreria) return;
+  // el aviso de versión siempre va a internet
+  if (propio && url.pathname.endsWith('/version.txt')) return;
+  // "Actualizar": esperar a la versión nueva de internet y guardarla como la copia de la app
+  if (propio && url.searchParams.has('act')) {
+    e.respondWith(fetch(new Request(url.origin + url.pathname, { cache: 'reload' })).then(res => {
+      if (res.ok) {
+        const c1 = res.clone(), c2 = res.clone();
+        caches.open(CACHE).then(k => { k.put('./', c1); k.put('./index.html', c2); });
+      }
+      return res;
+    }).catch(() => caches.match('./index.html')));
+    return;
+  }
   if (libreria) {
     e.respondWith(caches.match(req).then(r => r || fetch(req).then(res => guardar(req, res))));
     return;
