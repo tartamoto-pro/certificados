@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="theme-color" content="#4a525c">
+<title>Turnos</title>
+<link rel="manifest" href="manifest.webmanifest">
+<link rel="icon" href="icon-192.png">
+<link rel="apple-touch-icon" href="icon-192.png">
+<style>
+  :root { --di:#bf8fbf; --n:#7accc8; --m:#85cc9a; --barra:#4a525c; --linea:#222; }
+  * { box-sizing:border-box; -webkit-tap-highlight-color:transparent; }
+  html,body { margin:0; height:100%; background:#f2f2f2; font-family:Roboto, system-ui, sans-serif; color:#222; }
+  body { display:flex; flex-direction:column; }
+  header { background:var(--barra); color:#fff; padding:12px 14px; display:flex; align-items:center; gap:10px; }
+  header h1 { font-size:20px; margin:0; flex:1; font-weight:600; }
+  header button { background:none; border:2px solid #fff6; color:#fff; border-radius:8px; padding:6px 10px; font-size:15px; }
+  .mes { display:flex; align-items:center; justify-content:space-between; padding:8px 6px 4px; background:#fff; }
+  .mes h2 { margin:0; font-size:24px; font-weight:700; letter-spacing:.5px; text-transform:uppercase; }
+  .mes button { background:none; border:none; font-size:34px; padding:0 14px; color:#333; line-height:1; }
+  .dias, .rejilla { display:grid; grid-template-columns:repeat(7,1fr); background:#fff; }
+  .dias div { text-align:center; font-weight:700; color:#4a5f78; padding:4px 0 6px; font-size:15px; }
+  .rejilla { flex:1; grid-template-rows:repeat(6,1fr); gap:2px; background:#555; border-top:2px solid #555; border-bottom:2px solid #555; }
+  .c { position:relative; background:#fff; display:flex; align-items:center; justify-content:center; font-size:20px; min-height:64px; user-select:none; }
+  .c .num { position:absolute; top:3px; right:5px; font-size:17px; }
+  .c.Di { background:var(--di); } .c.N { background:var(--n); color:#065a5a; } .c.M { background:var(--m); }
+  .c.fuera::after { content:''; position:absolute; inset:0; background:rgba(255,255,255,.65); }
+  .c.fuera { color:#999; }
+  .c.hoy .num { color:#d00; font-weight:700; }
+  .c.hoy { box-shadow:inset 0 0 0 3px #222; }
+  .pie { background:#fff; padding:8px 10px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:8px; }
+  .leyenda { display:flex; justify-content:space-around; font-size:13px; }
+  .leyenda span { display:flex; align-items:center; gap:5px; }
+  .leyenda i { width:16px; height:16px; border-radius:3px; display:inline-block; }
+  .botones { display:flex; gap:8px; }
+  .botones button { flex:1; font-size:16px; padding:12px 6px; border-radius:10px; border:none; background:var(--barra); color:#fff; font-weight:600; }
+  .botones button.sec { background:#e4e6ea; color:#222; }
+  .botones button:disabled { opacity:.4; }
+  .ayuda { font-size:12px; color:#777; text-align:center; }
+  /* pantalla de la foto */
+  #capa { position:fixed; inset:0; background:#000d; display:none; flex-direction:column; z-index:9; color:#fff; }
+  #capa.si { display:flex; }
+  #capa .txt { padding:12px; font-size:16px; text-align:center; }
+  #lienzoBox { flex:1; overflow:auto; display:flex; justify-content:center; align-items:flex-start; }
+  #lienzo { max-width:100%; touch-action:manipulation; }
+  #capa .botones { padding:10px; }
+  #resumen { background:#fff; color:#222; margin:0 10px; border-radius:10px; padding:10px; display:none; }
+  #resumen .selmes { display:flex; align-items:center; justify-content:space-between; font-weight:700; font-size:18px; }
+  #resumen .selmes button { font-size:26px; border:none; background:none; padding:0 12px; }
+  #mini { display:grid; grid-template-columns:repeat(7,1fr); gap:2px; margin-top:6px; }
+  #mini div { font-size:12px; text-align:center; padding:3px 0; background:#eee; border-radius:3px; }
+  #mini div.Di { background:var(--di); } #mini div.N { background:var(--n); } #mini div.M { background:var(--m); }
+  #mini div.fuera { opacity:.25; }
+  #toast { position:fixed; left:50%; bottom:110px; transform:translateX(-50%); background:#222; color:#fff; padding:10px 16px; border-radius:20px; font-size:15px; display:none; z-index:20; max-width:90%; text-align:center; }
+</style>
+</head>
+<body>
+<header>
+  <h1>📅 Turnos</h1>
+  <button id="btnHoy">Hoy</button>
+</header>
+<div class="mes">
+  <button id="ant" aria-label="Mes anterior">‹</button>
+  <h2 id="titulo"></h2>
+  <button id="sig" aria-label="Mes siguiente">›</button>
+</div>
+<div class="dias"><div>LUN</div><div>MAR</div><div>MIÉ</div><div>JUE</div><div>VIE</div><div>SÁB</div><div>DOM</div></div>
+<div class="rejilla" id="rejilla"></div>
+<div class="pie">
+  <div class="leyenda">
+    <span><i style="background:var(--di)"></i>Di 8–20</span>
+    <span><i style="background:var(--m)"></i>M 8–15</span>
+    <span><i style="background:var(--n)"></i>N 20–8</span>
+  </div>
+  <div class="botones">
+    <button id="btnFoto">📷 Foto de su calendario</button>
+    <button id="btnGal" class="sec">🖼️ Galería</button>
+  </div>
+  <div class="ayuda">Toca un día para cambiar el turno a mano (libre → Di → N → M)</div>
+</div>
+<input type="file" id="fFoto" accept="image/*" capture="environment" hidden>
+<input type="file" id="fGal" accept="image/*" hidden>
+
+<div id="capa">
+  <div class="txt" id="capaTxt"></div>
+  <div id="lienzoBox"><canvas id="lienzo"></canvas></div>
+  <div id="resumen">
+    <div class="selmes"><button id="rAnt">‹</button><span id="rMes"></span><button id="rSig">›</button></div>
+    <div id="mini"></div>
+  </div>
+  <div class="botones">
+    <button id="cCancelar" class="sec">Cancelar</button>
+    <button id="cMarcar" class="sec">Marcar a mano</button>
+    <button id="cGuardar">Guardar</button>
+  </div>
+</div>
+<div id="toast"></div>
+
+<script src="lector.js"></script>
+<script>
+(function(){
+  var $ = function(id){ return document.getElementById(id); };
+  var MESES = ["Enero","Febrero","Marzo","Abril","Mayo","Junio","Julio","Agosto","Septiembre","Octubre","Noviembre","Diciembre"];
+  var CLAVE = "turnos-v1", CICLO = ["", "Di", "N", "M"];
+  var datos = {};
+  try { datos = JSON.parse(localStorage.getItem(CLAVE) || "null"); } catch(e) { datos = null; }
+  if (!datos) {
+    /* turnos ya leídos de las fotos de noviembre y diciembre de 2026 */
+    datos = {};
+    var ini = { "2026-11": {1:"Di",3:"Di",4:"Di",5:"Di",9:"Di",10:"N",12:"Di",14:"Di",15:"N",21:"N",23:"M",24:"M",25:"Di",26:"N",29:"M"},
+                "2026-12": {1:"Di",2:"N",5:"N",7:"M",8:"Di",12:"Di",13:"Di",17:"Di",18:"N",21:"Di",25:"Di",26:"Di",29:"N"},
+                "2027-01": {2:"M",3:"Di",4:"N",9:"N",10:"N"} };
+    Object.keys(ini).forEach(function(m){ Object.keys(ini[m]).forEach(function(d){ datos[m + "-" + ("0" + d).slice(-2)] = ini[m][d]; }); });
+    guardar();
+  }
+  function guardar(){ try { localStorage.setItem(CLAVE, JSON.stringify(datos)); } catch(e) {} }
+  function clave(f){ return f.getFullYear() + "-" + ("0" + (f.getMonth() + 1)).slice(-2) + "-" + ("0" + f.getDate()).slice(-2); }
+  /* lunes de la semana en la que cae el día 1 del mes */
+  function inicioRejilla(a, m){ var f = new Date(a, m, 1), dw = (f.getDay() + 6) % 7; return new Date(a, m, 1 - dw); }
+  function toast(t, ms){ var e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(function(){ e.style.display = "none"; }, ms || 2500); }
+
+  var hoy = new Date(), vA = hoy.getFullYear(), vM = hoy.getMonth();
+  function pintar(){
+    $("titulo").textContent = MESES[vM] + " " + vA;
+    var r = $("rejilla"); r.innerHTML = "";
+    var f0 = inicioRejilla(vA, vM), kh = clave(new Date());
+    for (var i = 0; i < 42; i++) {
+      var f = new Date(f0.getFullYear(), f0.getMonth(), f0.getDate() + i), k = clave(f), t = datos[k] || "";
+      var c = document.createElement("div");
+      c.className = "c " + t + (f.getMonth() !== vM ? " fuera" : "") + (k === kh ? " hoy" : "");
+      c.innerHTML = '<span class="num">' + f.getDate() + "</span>" + (t || "");
+      c.dataset.k = k;
+      c.addEventListener("click", function(){
+        var k = this.dataset.k, t = datos[k] || "", n = CICLO[(CICLO.indexOf(t) + 1) % CICLO.length];
+        if (n) datos[k] = n; else delete datos[k];
+        guardar(); pintar();
+      });
+      r.appendChild(c);
+    }
+  }
+  function mover(d){ vM += d; if (vM < 0) { vM = 11; vA--; } if (vM > 11) { vM = 0; vA++; } pintar(); }
+  $("ant").onclick = function(){ mover(-1); };
+  $("sig").onclick = function(){ mover(1); };
+  $("btnHoy").onclick = function(){ vA = new Date().getFullYear(); vM = new Date().getMonth(); pintar(); };
+  /* deslizar a los lados para cambiar de mes */
+  var x0 = null;
+  $("rejilla").addEventListener("touchstart", function(e){ x0 = e.touches[0].clientX; }, { passive:true });
+  $("rejilla").addEventListener("touchend", function(e){ if (x0 === null) return; var dx = e.changedTouches[0].clientX - x0; x0 = null; if (Math.abs(dx) > 70) mover(dx < 0 ? 1 : -1); });
+
+  /* ---------- foto ---------- */
+  var lienzo = $("lienzo"), ctx = lienzo.getContext("2d"), imgData = null, rejillaFoto = null, leidos = null, rA, rM, marcando = 0, esquinas = [];
+  $("btnFoto").onclick = function(){ $("fFoto").value = ""; $("fFoto").click(); };
+  $("btnGal").onclick = function(){ $("fGal").value = ""; $("fGal").click(); };
+  ["fFoto", "fGal"].forEach(function(id){ $(id).addEventListener("change", abrirFoto); });
+
+  function abrirFoto(){
+    var f = this.files && this.files[0]; if (!f) return;
+    var url = URL.createObjectURL(f), img = new Image();
+    toast("Leyendo la foto…");
+    img.onload = function(){
+      var W = 600, k = W / img.width;
+      lienzo.width = W; lienzo.height = Math.round(img.height * k);
+      ctx.drawImage(img, 0, 0, lienzo.width, lienzo.height);
+      URL.revokeObjectURL(url);
+      imgData = ctx.getImageData(0, 0, lienzo.width, lienzo.height);
+      rA = vA; rM = vM;
+      $("capa").classList.add("si");
+      rejillaFoto = LectorTurnos.buscarCuadricula(imgData);
+      $("toast").style.display = "none";
+      if (rejillaFoto) leer();
+      else empezarMarcar("No he encontrado la cuadrícula. ");
+    };
+    img.onerror = function(){ toast("No se pudo abrir la foto"); };
+    img.src = url;
+  }
+  function dibujar(){
+    ctx.putImageData(imgData, 0, 0);
+    if (!rejillaFoto) return;
+    var g = rejillaFoto, cw = (g.x1 - g.x0) / 7, ch = (g.y1 - g.y0) / 6;
+    ctx.strokeStyle = "#ff0"; ctx.lineWidth = 2;
+    for (var i = 0; i <= 7; i++) { ctx.beginPath(); ctx.moveTo(g.x0 + i * cw, g.y0); ctx.lineTo(g.x0 + i * cw, g.y1); ctx.stroke(); }
+    for (var j = 0; j <= 6; j++) { ctx.beginPath(); ctx.moveTo(g.x0, g.y0 + j * ch); ctx.lineTo(g.x1, g.y0 + j * ch); ctx.stroke(); }
+  }
+  function leer(){
+    marcando = 0;
+    leidos = LectorTurnos.leerCasillas(imgData, rejillaFoto);
+    dibujar();
+    $("capaTxt").textContent = "Comprueba que el mes es el de la foto y que los colores coinciden. Si la rejilla amarilla no cuadra, pulsa «Marcar a mano».";
+    $("resumen").style.display = "block"; $("cGuardar").disabled = false;
+    resumen();
+  }
+  function resumen(){
+    $("rMes").textContent = MESES[rM] + " " + rA;
+    var m = $("mini"); m.innerHTML = "";
+    var f0 = inicioRejilla(rA, rM);
+    for (var i = 0; i < 42; i++) {
+      var f = new Date(f0.getFullYear(), f0.getMonth(), f0.getDate() + i), t = leidos[i] || "", d = document.createElement("div");
+      d.className = t + (f.getMonth() !== rM ? " fuera" : "");
+      d.textContent = f.getDate() + (t && f.getMonth() === rM ? " " + t : "");
+      m.appendChild(d);
+    }
+  }
+  $("rAnt").onclick = function(){ rM--; if (rM < 0) { rM = 11; rA--; } resumen(); };
+  $("rSig").onclick = function(){ rM++; if (rM > 11) { rM = 0; rA++; } resumen(); };
+  function empezarMarcar(pre){
+    marcando = 1; esquinas = []; rejillaFoto = null; ctx.putImageData(imgData, 0, 0);
+    $("resumen").style.display = "none"; $("cGuardar").disabled = true;
+    $("capaTxt").textContent = (pre || "") + "Toca la esquina de ARRIBA a la IZQUIERDA del primer lunes de la cuadrícula.";
+  }
+  $("cMarcar").onclick = function(){ empezarMarcar(""); };
+  lienzo.addEventListener("click", function(e){
+    if (!marcando) return;
+    var r = lienzo.getBoundingClientRect(), x = (e.clientX - r.left) * lienzo.width / r.width, y = (e.clientY - r.top) * lienzo.height / r.height;
+    esquinas.push([x, y]);
+    ctx.fillStyle = "#f00"; ctx.beginPath(); ctx.arc(x, y, 7, 0, 7); ctx.fill();
+    if (esquinas.length === 1) $("capaTxt").textContent = "Ahora toca la esquina de ABAJO a la DERECHA del último domingo (sexta fila).";
+    else {
+      var a = esquinas[0], b = esquinas[1];
+      rejillaFoto = { x0: Math.min(a[0], b[0]), x1: Math.max(a[0], b[0]), y0: Math.min(a[1], b[1]), y1: Math.max(a[1], b[1]) };
+      leer();
+    }
+  });
+  function cerrar(){ $("capa").classList.remove("si"); imgData = null; marcando = 0; }
+  $("cCancelar").onclick = cerrar;
+  $("cGuardar").onclick = function(){
+    if (!leidos) return;
+    var f0 = inicioRejilla(rA, rM), n = 0;
+    for (var i = 0; i < 42; i++) {
+      var f = new Date(f0.getFullYear(), f0.getMonth(), f0.getDate() + i);
+      if (f.getMonth() !== rM) continue; // los días de otros meses salen difuminados en la foto: no se tocan
+      var k = clave(f);
+      if (leidos[i]) { datos[k] = leidos[i]; n++; } else delete datos[k];
+    }
+    guardar(); vA = rA; vM = rM; cerrar(); pintar();
+    toast(n + " turnos guardados en " + MESES[rM]);
+  };
+
+  pintar();
+  if ("serviceWorker" in navigator) navigator.serviceWorker.register("sw.js").catch(function(){});
+})();
+</script>
+</body>
+</html>
