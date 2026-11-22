@@ -27,7 +27,9 @@
   .c.Di { background:var(--di); } .c.N { background:var(--n); color:#065a5a; } .c.M { background:var(--m); }
   .c.fuera::after { content:''; position:absolute; inset:0; background:rgba(255,255,255,.65); }
   .c.fuera { color:#999; }
-  .c.hoy .num { color:#d00; font-weight:700; }
+  .c.hoy .num { font-weight:700; }
+  .c.fest .num { color:#d00; font-weight:700; }
+  .c .fn { position:absolute; left:2px; right:2px; bottom:3px; font-size:10px; line-height:1.1; color:#c00; font-weight:700; text-align:center; overflow:hidden; white-space:nowrap; text-overflow:ellipsis; }
   .c.hoy { box-shadow:inset 0 0 0 3px #222; }
   .pie { background:#fff; padding:8px 10px calc(10px + env(safe-area-inset-bottom)); display:flex; flex-direction:column; gap:8px; }
   .leyenda { display:flex; justify-content:space-around; font-size:13px; }
@@ -72,6 +74,7 @@
     <span><i style="background:var(--di)"></i>Di 8–20</span>
     <span><i style="background:var(--m)"></i>M 8–15</span>
     <span><i style="background:var(--n)"></i>N 20–8</span>
+    <span style="color:#d00;font-weight:700">12 Festivo</span>
   </div>
   <div class="botones">
     <button id="btnFoto">📷 Foto de su calendario</button>
@@ -120,6 +123,22 @@
   function inicioRejilla(a, m){ var f = new Date(a, m, 1), dw = (f.getDay() + 6) % 7; return new Date(a, m, 1 - dw); }
   function toast(t, ms){ var e = $("toast"); e.textContent = t; e.style.display = "block"; clearTimeout(toast.t); toast.t = setTimeout(function(){ e.style.display = "none"; }, ms || 2500); }
 
+  /* festivos nacionales de España + Jueves Santo (festivo en casi todas las comunidades, también Castilla-La Mancha) */
+  function pascua(a){ var b=a%19,c=Math.floor(a/100),d=a%100,e=Math.floor(c/4),f=c%4,g=Math.floor((c+8)/25),h=Math.floor((c-g+1)/3),
+    i=(19*b+c-e-h+15)%30,k=Math.floor(d/4),l=d%4,m=(32+2*f+2*k-i-l)%7,n=Math.floor((b+11*i+22*m)/451),mes=Math.floor((i+m-7*n+114)/31),dia=((i+m-7*n+114)%31)+1;
+    return new Date(a, mes-1, dia); }
+  var cacheFest = {};
+  function festivos(a){
+    if (cacheFest[a]) return cacheFest[a];
+    var f = {}, fijos = [[1,1,"Año Nuevo"],[1,6,"Reyes"],[5,1,"Día del Trabajo"],[8,15,"Asunción"],[10,12,"Fiesta Nacional"],
+      [11,1,"Todos los Santos"],[12,6,"Constitución"],[12,8,"Inmaculada"],[12,25,"Navidad"]];
+    fijos.forEach(function(x){ f[clave(new Date(a, x[0]-1, x[1]))] = x[2]; });
+    var p = pascua(a);
+    f[clave(new Date(a, p.getMonth(), p.getDate()-3))] = "Jueves Santo";
+    f[clave(new Date(a, p.getMonth(), p.getDate()-2))] = "Viernes Santo";
+    return (cacheFest[a] = f);
+  }
+  function festivo(f){ return festivos(f.getFullYear())[clave(f)] || ""; }
   var hoy = new Date(), vA = hoy.getFullYear(), vM = hoy.getMonth();
   function pintar(){
     $("titulo").textContent = MESES[vM] + " " + vA;
@@ -128,8 +147,9 @@
     for (var i = 0; i < 42; i++) {
       var f = new Date(f0.getFullYear(), f0.getMonth(), f0.getDate() + i), k = clave(f), t = datos[k] || "";
       var c = document.createElement("div");
-      c.className = "c " + t + (f.getMonth() !== vM ? " fuera" : "") + (k === kh ? " hoy" : "");
-      c.innerHTML = '<span class="num">' + f.getDate() + "</span>" + (t || "");
+      var fe = festivo(f);
+      c.className = "c " + t + (f.getMonth() !== vM ? " fuera" : "") + (k === kh ? " hoy" : "") + (fe ? " fest" : "");
+      c.innerHTML = '<span class="num">' + f.getDate() + "</span>" + (t || "") + (fe ? '<span class="fn">' + fe + "</span>" : "");
       c.dataset.k = k;
       c.addEventListener("click", function(){
         var k = this.dataset.k, t = datos[k] || "", n = CICLO[(CICLO.indexOf(t) + 1) % CICLO.length];
